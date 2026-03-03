@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, writeBatch, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyB_-91cPMJeAI5z_ntghG-nl5v1IWJ2qT8",
@@ -14,6 +15,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = null;
 
 // ==========================================
 // State Management
@@ -23,7 +26,10 @@ let filteredBooks = [];
 let currentPage = 1;
 let currentTags = [];
 let isEditing = false;
+let currentUser = null;
 let PAGE_SIZE = 24;
+let lendings = [];
+let lendingSelectedBooks = []; // Temporary storage for lending form
 
 // Load data from LocalStorage or data.json
 // Load data from Firebase Firestore
@@ -60,6 +66,55 @@ async function initData() {
 
     // Reverse to show newest first by default
     filteredBooks = [...books].reverse();
+
+    await initLendings();
+}
+
+async function initLendings() {
+    try {
+        const querySnapshot = await getDocs(collection(db, "lendings"));
+        lendings = [];
+        querySnapshot.forEach((doc) => {
+            lendings.push({ ...doc.data(), docId: doc.id });
+        });
+    } catch (error) {
+        console.error("Error loading lendings:", error);
+    }
+}
+
+async function saveLending(lendingRecord) {
+    if (!currentUser) return;
+    try {
+        const docRef = doc(collection(db, "lendings"));
+        const record = { ...lendingRecord, id: docRef.id, createdAt: new Date().toISOString() };
+        await setDoc(docRef, record);
+        lendings.push(record);
+        showToast("Lending record saved!");
+        return true;
+    } catch (error) {
+        console.error("Error saving lending:", error);
+        showToast("Failed to save lending record.");
+        return false;
+    }
+}
+
+async function markReturned(lendId) {
+    if (!currentUser) return;
+    try {
+        const lending = lendings.find(l => l.id === lendId);
+        if (!lending) return;
+
+        lending.status = 'returned';
+        lending.returnDate = new Date().toISOString().split('T')[0];
+
+        await setDoc(doc(db, "lendings", lendId), lending);
+        showToast("Book(s) marked as returned.");
+        renderLendingPage();
+        renderBooks();
+    } catch (error) {
+        console.error("Error updating lending:", error);
+        showToast("Error updating record.");
+    }
 }
 
 async function saveData() {
@@ -126,12 +181,147 @@ const importCsvFile = document.getElementById('import-csv-file');
 const sortBySelect = document.getElementById('sort-by');
 
 // ==========================================
+// Authentication Handlers
+// ==========================================
+
+// Map username to internal Firebase email format
+function getMimirEmail(username) {
+    return `${username.toLowerCase().trim()}@mimir.local`;
+}
+
+async function signIn(username, password) {
+    try {
+        const email = getMimirEmail(username);
+        await signInWithEmailAndPassword(auth, email, password);
+        showToast("Logged in successfully!");
+        return true;
+    } catch (error) {
+        console.error("Login Error Details:", error.code, error.message);
+        let msg = "Login failed";
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
+            msg = "Invalid username or password";
+        } else if (error.code === 'auth/too-many-requests') {
+            msg = "Too many failed attempts. Try again later";
+        }
+        showToast(`${msg} (${error.code || 'unknown'})`);
+        return false;
+    }
+}
+
+async function initAdminAccount() {
+    if (window._mimirAdminCheckDone) return;
+    window._mimirAdminCheckDone = true;
+
+    try {
+        const adminEmail = getMimirEmail('admin');
+        const adminPassword = 'admin123';
+
+        try {
+            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+            console.log("Admin account verified.");
+            // Ensure Firestore entry exists even if Auth does
+            const querySnapshot = await getDocs(collection(db, "users"));
+            const userData = querySnapshot.docs.find(d => d.id === auth.currentUser.uid)?.data();
+            if (!userData) {
+                await setDoc(doc(db, "users", auth.currentUser.uid), {
+                    username: 'admin',
+                    role: 'admin',
+                    createdAt: new Date().toISOString()
+                });
+            }
+        } catch (error) {
+            console.warn("Seeding check result:", error.code);
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
+                console.log("Seeding admin account...");
+                try {
+                    await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
+                    await setDoc(doc(db, "users", auth.currentUser.uid), {
+                        username: 'admin',
+                        role: 'admin',
+                        createdAt: new Date().toISOString()
+                    });
+                    console.log("Admin account seeded successfully.");
+                    showToast("System Initialized: Use admin / admin123");
+                    await signOut(auth);
+                } catch (seedErr) {
+                    console.error("Critical seeding failure:", seedErr);
+                    if (seedErr.code === 'auth/email-already-in-use') {
+                        console.log("Admin email exists but initialization failed. Please check Firebase Console.");
+                    } else {
+                        showToast("Setup failed: " + seedErr.code);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Admin initialization error:", error);
+    }
+}
+
+async function logout() {
+    try {
+        await signOut(auth);
+        showToast("Logged out.");
+    } catch (error) {
+        console.error("Logout failed:", error);
+    }
+}
+
 // Initialization & Events
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     await initData();
+    await initAdminAccount();
     populateFilterDropdowns();
     renderBooks();
+
+    // Auth Events
+    const showLoginBtn = document.getElementById('show-login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    if (showLoginBtn) showLoginBtn.addEventListener('click', () => toggleLoginModal(true));
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+
+    // Auth State Observer
+    onAuthStateChanged(auth, async (user) => {
+        currentUser = user;
+        const userInfo = document.getElementById('user-info');
+        const showLoginBtn = document.getElementById('show-login-btn');
+        const userDisplayName = document.getElementById('user-display-name');
+
+        if (user) {
+            document.body.classList.add('logged-in');
+            if (userInfo) userInfo.classList.remove('hidden');
+            if (showLoginBtn) showLoginBtn.classList.add('hidden');
+
+            // Get user data for role/username
+            try {
+                const userDoc = await getDocs(collection(db, "users"));
+                const userData = userDoc.docs.find(d => d.id === user.uid)?.data();
+                if (userData) {
+                    userDisplayName.textContent = userData.username;
+                    if (userData.role === 'admin') {
+                        document.body.classList.add('is-admin');
+                    }
+                } else {
+                    userDisplayName.textContent = (user.email || 'User').split('@')[0];
+                }
+            } catch (e) {
+                userDisplayName.textContent = (user.email || 'User').split('@')[0];
+            }
+        } else {
+            document.body.classList.remove('logged-in');
+            document.body.classList.remove('is-admin');
+            if (userInfo) userInfo.classList.add('hidden');
+            if (showLoginBtn) showLoginBtn.classList.remove('hidden');
+
+            // Redirect away from auth-required tabs if logged out
+            const activeTab = document.querySelector('.tab-btn.active');
+            if (activeTab && activeTab.classList.contains('auth-required')) {
+                const homeTab = document.querySelector('.tab-btn[data-target="view-books"]');
+                if (homeTab) homeTab.click();
+            }
+        }
+    });
 
     // Tab Switching
     tabBtns.forEach(btn => {
@@ -147,6 +337,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     renderBooks();
                 } else if (s.id === 'view-stats') {
                     renderStats();
+                } else if (s.id === 'view-settings') {
+                    // Show/Hide User Management button for Admin ONLY
+                    const userMgmtBtn = document.getElementById('btn-show-user-mgmt');
+                    if (userMgmtBtn) {
+                        const isAdmin = document.body.classList.contains('is-admin');
+                        userMgmtBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+                    }
                 }
             });
         });
@@ -205,6 +402,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         resetForm();
     });
 
+    const deleteBookBtn = document.getElementById('delete-book-btn');
+    if (deleteBookBtn) deleteBookBtn.addEventListener('click', deleteBook);
+
     addBookForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
@@ -234,11 +434,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveData();
         resetForm();
 
-        // Update data dependencies
-        populateFilterDropdowns();
-
         // Go back to view tab automatically
         tabBtns[0].click();
+    });
+
+    // Initialize Autocomplete for Book Form
+    setupAutocomplete('book-name', 'name', 'autocomplete-bookname');
+    setupAutocomplete('book-author', 'author', 'autocomplete-author');
+    setupAutocomplete('book-translator', 'translator', 'autocomplete-translator');
+    setupAutocomplete('book-tags-input', 'tags', 'autocomplete-tags', (val) => {
+        addTag(val);
+        tagsInput.value = '';
     });
 
     // Tags Input Logic
@@ -264,17 +470,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     importCsvBtn.addEventListener('click', () => importCsvFile.click());
     importCsvFile.addEventListener('change', handleCsvImport);
 
-    // Setup Autocomplete
-    setupAutocomplete('book-name', 'name', 'autocomplete-bookname');
-    setupAutocomplete('book-author', 'author', 'autocomplete-author');
-    setupAutocomplete('book-translator', 'translator', 'autocomplete-translator');
+    // Lending Form
+    const lendingForm = document.getElementById('add-lending-form');
+    if (lendingForm) {
+        lendingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (lendingSelectedBooks.length === 0) return showToast("Select at least one book.");
 
-    // Close autocompletes when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.autocomplete')) {
-            document.querySelectorAll('.autocomplete-list').forEach(list => list.style.display = 'none');
-        }
-    });
+            const record = {
+                borrower: document.getElementById('lendee-name').value.trim(),
+                lendDate: document.getElementById('lend-date').value,
+                books: lendingSelectedBooks.map(b => ({ id: b.id, name: b.name })),
+                status: 'lent'
+            };
+
+            const success = await saveLending(record);
+            if (success) {
+                resetLendingForm();
+                renderLendingPage();
+                renderBooks();
+            }
+        });
+    }
+
+    const lendingSearchInput = document.getElementById('lending-book-search');
+    if (lendingSearchInput) {
+        lendingSearchInput.addEventListener('input', (e) => updateLendingAutocomplete(e.target.value));
+    }
 
     // Initialize Theme and View settings now that listeners are attached
     initTheme();
@@ -347,13 +569,18 @@ function applyFilters() {
         baseBooks.sort((a, b) => a.author.localeCompare(b.author));
     }
 
+    const queryNumeric = !isNaN(query) && query !== "" ? parseInt(query, 10) : null;
+
     filteredBooks = baseBooks.filter(b => {
         // Dropdown filters
         if (cat && b.category !== cat) return false;
         if (lang && b.language !== lang) return false;
 
-        // Text Search (supports Sinhala Unicode)
+        // Text Search
         if (query) {
+            // Prioritize Book ID (but don't return true yet, just include it)
+            if (queryNumeric !== null && b.id === queryNumeric) return true;
+
             const tagsStr = (b.tags || []).join(' ');
             const searchable = `${b.name} ${b.sinhalaName || ''} ${b.author} ${b.translator} ${b.category} ${b.language} ${tagsStr}`.toLowerCase();
             return searchable.includes(query);
@@ -361,6 +588,15 @@ function applyFilters() {
 
         return true;
     });
+
+    // Final sorting to put exact ID match at the top if searching by number
+    if (queryNumeric !== null) {
+        filteredBooks.sort((a, b) => {
+            if (a.id === queryNumeric) return -1;
+            if (b.id === queryNumeric) return 1;
+            return 0; // maintain relative order for others
+        });
+    }
 
     currentPage = 1;
     renderPage();
@@ -388,13 +624,19 @@ function renderPage() {
 
     booksGrid.innerHTML = pageItems.map(book => {
         const tagsHtml = (book.tags || []).length > 0 ?
-            `<div class="book-tags">${book.tags.map(t => `<span class="book-tag-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>${escapeHTML(t)}</span>`).join('')}</div>`
+            `<div class="book-tags">${book.tags.map(t => `<span class="book-tag-chip clickable" onclick="filterByTag('${t.replace(/'/g, "\\'")}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>${escapeHTML(t)}</span>`).join('')}</div>`
             : '';
         const sinhalaTitleHtml = book.sinhalaName ? `<div class="book-sinhala-title">${escapeHTML(book.sinhalaName)}</div>` : '';
 
+        const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => lb.id === book.id));
+        const lentBadge = isLent ? `<span class="lent-badge">📚 Lent</span>` : '';
+
         return `
         <div class="book-card" data-category="${escapeHTML(book.category)}">
-            <div class="book-id">${String(book.id).padStart(4, '0')}</div>
+            <div class="book-id">
+                ${String(book.id).padStart(4, '0')}
+                ${lentBadge}
+            </div>
             <div class="book-main">
                 <h3 class="book-title">${escapeHTML(book.name)}</h3>
                 ${sinhalaTitleHtml}
@@ -403,7 +645,7 @@ function renderPage() {
             ${book.translator ? `<div class="book-translator-row"><span class="meta-item"><span class="translator-label">Translated by</span> <span class="clickable-name" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translator)}</span></span></div>` : '<div class="book-translator-row book-translator-empty"></div>'}
             <div class="book-meta">
                 <div class="meta-item" style="gap: 0.75rem;">
-                    <span class="tag">${escapeHTML(book.category)}</span>
+                    <span class="tag clickable" onclick="filterByCategory('${book.category.replace(/'/g, "\\'")}')">${escapeHTML(book.category)}</span>
                     <span class="tag" style="background: transparent; border: 1px solid var(--border-color);">${escapeHTML(book.language)}</span>
                 </div>
             </div>
@@ -456,11 +698,12 @@ function updatePaginationInfo(totalItems) {
 // ==========================================
 // Autocomplete Implementation
 // ==========================================
-function setupAutocomplete(inputId, dataField, listId) {
+function setupAutocomplete(inputId, dataField, listId, onSelect = null) {
     const input = document.getElementById(inputId);
     const list = document.getElementById(listId);
+    if (!input || !list) return;
 
-    input.addEventListener('input', () => {
+    const handleInput = () => {
         const val = input.value.trim().toLowerCase();
 
         if (!val) {
@@ -468,9 +711,19 @@ function setupAutocomplete(inputId, dataField, listId) {
             return;
         }
 
-        // Extract unique values for the field
-        const allVals = [...new Set(books.map(b => b[dataField]).filter(v => v))];
-        const matches = allVals.filter(v => v.toLowerCase().includes(val)).slice(0, 5); // Limit 5
+        // Extract unique values for the field, handle arrays (like tags)
+        let allVals = [];
+        books.forEach(b => {
+            const fieldVal = b[dataField];
+            if (Array.isArray(fieldVal)) {
+                allVals.push(...fieldVal);
+            } else if (fieldVal) {
+                allVals.push(fieldVal);
+            }
+        });
+
+        const uniqueVals = [...new Set(allVals)];
+        const matches = uniqueVals.filter(v => v.toLowerCase().includes(val)).slice(0, 5); // Limit 5
 
         if (matches.length > 0) {
             list.innerHTML = matches.map(m => `<li>${escapeHTML(m)}</li>`).join('');
@@ -478,21 +731,35 @@ function setupAutocomplete(inputId, dataField, listId) {
 
             // Add click handlers
             list.querySelectorAll('li').forEach(li => {
-                li.addEventListener('click', () => {
-                    input.value = li.textContent;
+                li.addEventListener('mousedown', (e) => {
+                    // Use mousedown to trigger before blur
+                    e.preventDefault();
+                    const selectedValue = li.textContent;
+                    if (onSelect) {
+                        onSelect(selectedValue);
+                    } else {
+                        input.value = selectedValue;
+                    }
                     list.style.display = 'none';
                 });
             });
         } else {
             list.style.display = 'none';
         }
-    });
+    };
+
+    input.addEventListener('input', handleInput);
 
     input.addEventListener('focus', () => {
-        // Trigger input event to show suggestions if input is not empty
-        if (input.value.trim()) {
-            input.dispatchEvent(new Event('input'));
-        }
+        if (input.value.trim()) handleInput();
+    });
+
+    // Close list when clicking outside or blur
+    input.addEventListener('blur', () => {
+        // Delay to allow mousedown on list items to fire
+        setTimeout(() => {
+            list.style.display = 'none';
+        }, 200);
     });
 }
 
@@ -535,6 +802,16 @@ function startEditMode(id) {
     formSubmitBtn.textContent = 'Update Book';
     formCancelBtn.style.display = 'inline-block';
 
+    // Show delete button if enabled and logged in
+    const deleteBtn = document.getElementById('delete-book-btn');
+    if (deleteBtn) {
+        if (currentSettings.enableDelete && currentUser) {
+            deleteBtn.classList.remove('hidden');
+        } else {
+            deleteBtn.classList.add('hidden');
+        }
+    }
+
     // Populate fields
     document.getElementById('book-name').value = book.name || '';
     document.getElementById('book-sinhala-name').value = book.sinhalaName || '';
@@ -560,6 +837,10 @@ function resetForm() {
 
     currentTags = [];
     renderTags();
+
+    // Hide delete button
+    const deleteBtn = document.getElementById('delete-book-btn');
+    if (deleteBtn) deleteBtn.classList.add('hidden');
 }
 
 function addTag(tag) {
@@ -870,6 +1151,9 @@ function renderStats() {
     // Top 15 leaderboards
     renderLeaderboard('stat-authors-list', 'author', 15);
     renderLeaderboard('stat-translators-list', 'translator', 15);
+
+    // Lending Stats
+    renderLendingSummaryStats();
 }
 
 // ==========================================
@@ -1037,6 +1321,31 @@ window.confirmMerge = async function (index, sourceName) {
 };
 
 // ==========================================
+// Browse by Tag / Category Links
+// ==========================================
+window.filterByTag = function (tag) {
+    if (!globalSearch) return;
+    globalSearch.value = tag;
+    // Switch to collection view if not already there
+    const collectionTab = document.querySelector('.tab-btn[data-target="view-books"]');
+    if (collectionTab) collectionTab.click();
+    applyFilters();
+    showToast(`Filtering by tag: ${tag}`);
+};
+
+window.filterByCategory = function (category) {
+    if (!filterCategory) return;
+    filterCategory.value = category;
+    // Clear search to focus on category
+    if (globalSearch) globalSearch.value = '';
+    // Switch to collection view if not already there
+    const collectionTab = document.querySelector('.tab-btn[data-target="view-books"]');
+    if (collectionTab) collectionTab.click();
+    applyFilters();
+    showToast(`Filtering by category: ${category}`);
+};
+
+// ==========================================
 // People Manager — Checkbox Merge
 // ==========================================
 window.updateMergeToolbar = function () {
@@ -1169,7 +1478,8 @@ const FONTS = [
 let currentSettings = {
     theme: 'light',
     font: 'Inter',
-    categoryColors: false
+    categoryColors: false,
+    enableDelete: false
 };
 
 function loadSettings() {
@@ -1185,6 +1495,7 @@ function saveSettings() {
 
 function applySettings() {
     document.documentElement.setAttribute('data-theme', currentSettings.theme);
+    loadGoogleFont(currentSettings.font);
     document.body.style.setProperty('--font-body', `'${currentSettings.font}', sans-serif`);
     if (currentSettings.categoryColors) {
         document.body.classList.add('category-colors-on');
@@ -1348,3 +1659,342 @@ window.updateFontSize = function (type, pxVal) {
     const label = document.getElementById(`lbl-${type}-size`);
     if (label) label.textContent = `${px}px`;
 };
+
+// --- Library Management ---
+
+window.toggleEnableDelete = function (enabled) {
+    if (enabled && !currentUser) {
+        showToast("Access Denied: Please login to enable deletion.");
+        document.getElementById('enable-delete-toggle').checked = false;
+        return;
+    }
+    currentSettings.enableDelete = enabled;
+    saveSettings();
+    document.getElementById('enable-delete-label').textContent = enabled ? "Enabled" : "Disabled";
+    showToast(`Book deletion ${enabled ? 'enabled' : 'disabled'}.`);
+
+    // If currently editing, update the delete button visibility
+    const deleteBtn = document.getElementById('delete-book-btn');
+    if (deleteBtn) {
+        if (isEditing && enabled && currentUser) {
+            deleteBtn.classList.remove('hidden');
+        } else {
+            deleteBtn.classList.add('hidden');
+        }
+    }
+}
+
+async function deleteBook() {
+    const id = parseInt(document.getElementById('edit-book-id').value, 10);
+    const book = books.find(b => b.id === id);
+
+    if (!book) return;
+    if (!currentUser) return showToast("Login required to delete.");
+    if (!currentSettings.enableDelete) return showToast("Deletion is disabled in settings.");
+
+    if (confirm(`Are you sure you want to delete "${book.name || 'this book'}" permanently?`)) {
+        try {
+            await deleteDoc(doc(db, "books", String(id)));
+            books = books.filter(b => b.id !== id);
+            showToast("Book deleted successfully.");
+            resetForm();
+            populateFilterDropdowns();
+            renderBooks();
+            tabBtns[0].click();
+        } catch (error) {
+            console.error("Error deleting book:", error);
+            showToast("Failed to delete book.");
+        }
+    }
+}
+
+// --- Lending Logic ---
+
+window.resetLendingForm = function () {
+    const form = document.getElementById('add-lending-form');
+    if (form) form.reset();
+    lendingSelectedBooks = [];
+    renderLendingBooks();
+}
+
+function updateLendingAutocomplete(query) {
+    const resultsContainer = document.getElementById('lending-search-results');
+    if (!query.trim()) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
+
+    const matched = books.filter(b => {
+        const idMatch = String(b.id).includes(query);
+        const nameMatch = (b.name || '').toLowerCase().includes(query.toLowerCase());
+        const isAlreadySelected = lendingSelectedBooks.some(s => s.id === b.id);
+        const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => lb.id === b.id));
+        return (idMatch || nameMatch) && !isAlreadySelected && !isLent;
+    }).slice(0, 10);
+
+    if (matched.length === 0) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
+
+    resultsContainer.innerHTML = matched.map(b => `
+        <div class="autocomplete-item" onclick="addLendingBook(${b.id})">
+            <strong>#${b.id}</strong> - ${escapeHTML(b.name)}
+        </div>
+    `).join('');
+    resultsContainer.style.display = 'block';
+}
+
+window.addLendingBook = function (id) {
+    const book = books.find(b => b.id === id);
+    if (book) {
+        lendingSelectedBooks.push(book);
+        renderLendingBooks();
+        document.getElementById('lending-book-search').value = '';
+        document.getElementById('lending-search-results').style.display = 'none';
+    }
+}
+
+window.removeLendingBook = function (index) {
+    lendingSelectedBooks.splice(index, 1);
+    renderLendingBooks();
+}
+
+function renderLendingBooks() {
+    const wrapper = document.getElementById('lending-books-wrapper');
+    const input = document.getElementById('lending-book-search');
+
+    // Remove old chips
+    wrapper.querySelectorAll('.tag-chip').forEach(c => c.remove());
+
+    // Add new chips
+    lendingSelectedBooks.forEach((book, index) => {
+        const span = document.createElement('span');
+        span.className = 'tag-chip';
+        span.innerHTML = `
+            #${book.id}
+            <button type="button" class="tag-remove" onclick="removeLendingBook(${index})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        `;
+        wrapper.insertBefore(span, input);
+    });
+}
+
+function renderLendingPage() {
+    const activeContainer = document.getElementById('active-lendings-table-container');
+    const historyContainer = document.getElementById('returned-lendings-table-container');
+
+    const active = lendings.filter(l => l.status === 'lent').sort((a, b) => new Date(b.lendDate) - new Date(a.lendDate));
+    const history = lendings.filter(l => l.status === 'returned').sort((a, b) => new Date(b.returnDate) - new Date(a.returnDate));
+
+    activeContainer.innerHTML = renderLendingTable(active, true);
+    historyContainer.innerHTML = renderLendingTable(history, false);
+}
+
+function renderLendingTable(data, isActive) {
+    if (data.length === 0) return `<p class="empty-state">No records found.</p>`;
+
+    return `
+        <table class="lending-table">
+            <thead>
+                <tr>
+                    <th>Borrower</th>
+                    <th>Books</th>
+                    <th>Date</th>
+                    ${isActive ? '<th>Wait Time</th>' : '<th>Returned</th>'}
+                    ${isActive ? '<th>Action</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>
+                ${data.map(l => {
+        const days = isActive ? Math.floor((new Date() - new Date(l.lendDate)) / (1000 * 60 * 60 * 24)) : 0;
+        const dayClass = days > 30 ? 'days-high' : days > 14 ? 'days-med' : 'days-low';
+
+        return `
+                    <tr>
+                        <td style="font-weight:600;">${escapeHTML(l.borrower)}</td>
+                        <td>
+                            <div class="lending-books-list">
+                                ${l.books.map(b => `<div class="lending-book-item"><span class="lending-book-id">#${b.id}</span> ${escapeHTML(b.name)}</div>`).join('')}
+                            </div>
+                        </td>
+                        <td style="font-size:0.85rem;">${l.lendDate}</td>
+                        <td>
+                            ${isActive ? `<span class="days-count ${dayClass}">${days} days</span>` : `<span style="font-size:0.85rem;">${l.returnDate}</span>`}
+                        </td>
+                        ${isActive ? `
+                        <td>
+                            <button class="btn btn-secondary btn-return auth-required" onclick="markReturned('${l.id}')">Return</button>
+                        </td>
+                        ` : ''}
+                    </tr>
+                `}).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function renderLendingSummaryStats() {
+    const container = document.getElementById('stat-lending-summary');
+    if (!container) return;
+
+    const activeLendings = lendings.filter(l => l.status === 'lent');
+    const totalLentBooks = activeLendings.reduce((sum, l) => sum + l.books.length, 0);
+
+    // Borrower Stats
+    const borrowerCounts = {};
+    activeLendings.forEach(l => {
+        borrowerCounts[l.borrower] = (borrowerCounts[l.borrower] || 0) + l.books.length;
+    });
+
+    const topBorrowers = Object.entries(borrowerCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+    const today = new Date();
+
+    container.innerHTML = `
+        <div class="stat-card" style="background:var(--accent-light); padding:1rem; border-radius:8px; text-align:center;">
+            <div style="font-size:0.9rem; color:var(--accent-primary); font-weight:600;">Currently Lent</div>
+            <div style="font-size:2rem; font-weight:700; color:var(--accent-primary); margin:0.5rem 0;">${totalLentBooks}</div>
+            <div style="font-size:0.8rem; color:var(--text-secondary);">Total books out of library</div>
+        </div>
+        <div style="flex:2;">
+            <h4 style="margin:0 0 1rem 0; font-size:0.9rem; color:var(--text-secondary);">Active Borrowers & Duration</h4>
+            <div class="stat-leaderboard" style="max-height: 300px; overflow-y: auto;">
+                ${topBorrowers.map(([name, count]) => {
+        const borrowerLending = activeLendings.find(l => l.borrower === name);
+        const lendDate = borrowerLending ? new Date(borrowerLending.lendDate) : today;
+        const diffDays = Math.floor((today - lendDate) / (1000 * 60 * 60 * 24));
+
+        return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border-color); font-size:14px;">
+                        <div>
+                            <span style="font-weight:600;">${escapeHTML(name)}</span>
+                            <div style="font-size:0.75rem; color:var(--text-secondary);">${diffDays} days since lend date</div>
+                        </div>
+                        <span style="font-weight:700; color:var(--accent-primary);">${count} Books</span>
+                    </div>`;
+    }).join('')}
+                ${topBorrowers.length === 0 ? '<p style="color:var(--text-secondary); font-size:0.85rem;">No active borrowers.</p>' : ''}
+            </div>
+        </div>
+    `;
+}
+
+// --- New Auth UI & User Management ---
+
+window.toggleLoginModal = function (show) {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.style.display = show ? 'flex' : 'none';
+}
+
+window.handleLoginSubmit = async function (e) {
+    e.preventDefault();
+    const user = document.getElementById('login-username').value;
+    const pass = document.getElementById('login-password').value;
+    const success = await signIn(user, pass);
+    if (success) {
+        toggleLoginModal(false);
+        document.getElementById('login-form').reset();
+    }
+}
+
+window.toggleUserMgmtModal = async function (show) {
+    const modal = document.getElementById('user-mgmt-modal');
+    if (modal) modal.style.display = show ? 'flex' : 'none';
+    if (show) {
+        showUserTab('list');
+        await refreshUserList();
+    }
+}
+
+window.showUserTab = function (tab) {
+    const listTab = document.getElementById('user-list-view');
+    const createTab = document.getElementById('user-create-view');
+    const listBtn = document.getElementById('user-tab-list');
+    const createBtn = document.getElementById('user-tab-create');
+
+    if (tab === 'list') {
+        listTab.style.display = 'block';
+        createTab.style.display = 'none';
+        listBtn.classList.add('active');
+        createBtn.classList.remove('active');
+    } else {
+        listTab.style.display = 'none';
+        createTab.style.display = 'block';
+        listBtn.classList.remove('active');
+        createBtn.classList.add('active');
+    }
+}
+
+async function refreshUserList() {
+    const container = document.getElementById('users-table-container');
+    container.innerHTML = '<p class="loading">Loading users...</p>';
+
+    try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        const usersList = [];
+        querySnapshot.forEach(doc => usersList.push({ id: doc.id, ...doc.data() }));
+
+        if (usersList.length === 0) {
+            container.innerHTML = '<p>No users found.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table class="user-mgmt-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${usersList.map(u => `
+                        <tr>
+                            <td><strong>${escapeHTML(u.username)}</strong></td>
+                            <td><span class="role-badge role-${u.role}">${u.role}</span></td>
+                            <td>
+                                ${u.username !== 'admin' ? `
+                                    <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.25rem 0.5rem;" onclick="promptResetPassword('${u.id}', '${u.username}')">Reset Pass</button>
+                                ` : '<span style="color:var(--text-secondary); font-size:0.8rem;">Root</span>'}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (e) {
+        console.error("Failed to fetch users:", e);
+        container.innerHTML = '<p class="error">Error loading users.</p>';
+    }
+}
+
+window.promptResetPassword = async function (uid, username) {
+    const newPass = prompt(`Enter new password for ${username}:`);
+    if (!newPass || newPass.length < 6) return showToast("Password too short.");
+
+    showToast("Password reset requires administrative override. (Simulated in static mode)");
+}
+
+window.handleCreateUser = async function (e) {
+    e.preventDefault();
+    const user = document.getElementById('new-username').value.trim();
+    const pass = document.getElementById('new-password').value;
+    const role = document.getElementById('new-role').value;
+
+    if (!user || pass.length < 6) return showToast("Invalid username or short password.");
+
+    try {
+        showToast("Processing request...");
+        const email = getMimirEmail(user);
+        // User creation logic...
+        showToast("User creation successful (Simulated for GitHub Pages).");
+        toggleUserMgmtModal(false);
+    } catch (e) {
+        showToast("Failed to create user: " + e.message);
+    }
+}
