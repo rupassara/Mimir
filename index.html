@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mimir Home Library</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Chart.js for Statistics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+                    </svg>
+                    <h1>Mimir Library</h1>
+                </div>
+                <div class="header-actions">
+                    <nav class="tabs">
+                        <button class="tab-btn active" data-target="view-books">Collection</button>
+                        <button class="tab-btn" data-target="add-book">Add / Edit Book</button>
+                        <button class="tab-btn" data-target="view-stats">Statistics</button>
+                        <button class="tab-btn" data-target="view-people">People</button>
+                        <button class="tab-btn" data-target="view-settings">⚙️ Settings</button>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- View Books Section -->
+            <section id="view-books" class="view-section active">
+                <div class="search-bar-container">
+                    <div class="search-actions">
+                        <div class="search-input-wrapper">
+                            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                            <input type="text" id="global-search"
+                                placeholder="Search by name, author, translator, category, or tags...">
+                        </div>
+
+                        <div class="action-buttons-group" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <!-- Import CSV File Input (Hidden) -->
+                            <input type="file" id="import-csv-file" accept=".csv" style="display: none;">
+                            <button id="import-csv-btn" class="btn btn-secondary csv-btn" title="Upload from CSV">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="7 10 12 15 17 10" />
+                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                Import
+                            </button>
+                            <button id="export-csv" class="btn btn-secondary csv-btn" title="Download as CSV">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                Export
+                            </button>
+
+                            <div class="view-toggles"
+                                style="display: flex; background: var(--surface); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; height: 100%;">
+                                <button id="btn-list-view" class="icon-btn" aria-label="List View"
+                                    style="border-radius: 0; border: none; padding: 0.5rem 0.75rem;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                    </svg>
+                                </button>
+                                <button id="btn-grid-view" class="icon-btn active" aria-label="Grid View"
+                                    style="border-radius: 0; border: none; border-left: 1px solid var(--border-color); padding: 0.5rem 0.75rem;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="3" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="14" width="7" height="7"></rect>
+                                        <rect x="3" y="14" width="7" height="7"></rect>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filters-container">
+                    <div class="filter-group">
+                        <label for="sort-by">Sort By</label>
+                        <select id="sort-by">
+                            <option value="newest">Date Added (Newest)</option>
+                            <option value="oldest">Date Added (Oldest)</option>
+                            <option value="titleAsc">Title (A-Z)</option>
+                            <option value="titleDesc">Title (Z-A)</option>
+                            <option value="authorAsc">Author (A-Z)</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-category">Category</label>
+                        <select id="filter-category">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-language">Language</label>
+                        <select id="filter-language">
+                            <option value="">All Languages</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <div class="stats" id="book-stats" style="padding-top: 1.8rem;">
+                            Showing 0 books
+                        </div>
+                    </div>
+                </div>
+
+                <div class="books-grid" id="books-grid">
+                    <!-- Cards will be populated here -->
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination-container" id="pagination">
+                    <button class="btn btn-secondary" id="prev-page" disabled>Previous</button>
+                    <span id="page-info">Page 1 of 1</span>
+                    <button class="btn btn-secondary" id="next-page" disabled>Next</button>
+                </div>
+            </section>
+
+            <!-- Add Book Section -->
+            <section id="add-book" class="view-section" style="display: none;">
+                <div class="form-card">
+                    <h2 id="form-title">Add to Library</h2>
+                    <p class="subtitle" id="form-subtitle">Enter the details of the new book. Fields with suggestions
+                        will auto-complete as you type.</p>
+
+                    <form id="add-book-form">
+                        <input type="hidden" id="edit-book-id" value="">
+                        <div class="form-row">
+                            <div class="form-group autocomplete">
+                                <label for="book-name">Book Name *</label>
+                                <input type="text" id="book-name" required autocomplete="off"
+                                    placeholder="e.g. The Great Gatsby">
+                                <ul class="autocomplete-list" id="autocomplete-bookname"></ul>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="book-sinhala-name">Sinhala Name <span
+                                        style="font-weight:400; opacity:0.6">(optional — සිංහල නම)</span></label>
+                                <input type="text" id="book-sinhala-name" autocomplete="off" lang="si"
+                                    placeholder="e.g. මනස්ථාපය">
+                            </div>
+                        </div>
+
+                        <div class="form-row split">
+                            <div class="form-group autocomplete">
+                                <label for="book-author">Author *</label>
+                                <input type="text" id="book-author" required autocomplete="off"
+                                    placeholder="e.g. F. Scott Fitzgerald">
+                                <ul class="autocomplete-list" id="autocomplete-author"></ul>
+                            </div>
+                            <div class="form-group autocomplete">
+                                <label for="book-translator">Translator</label>
+                                <input type="text" id="book-translator" autocomplete="off"
+                                    placeholder="Leave blank if none">
+                                <ul class="autocomplete-list" id="autocomplete-translator"></ul>
+                            </div>
+                        </div>
+
+                        <div class="form-row split">
+                            <div class="form-group">
+                                <label for="book-language">Language *</label>
+                                <select id="book-language" required>
+                                    <option value="" disabled selected>Select a language</option>
+                                    <option value="English">English</option>
+                                    <option value="Sinhala">Sinhala</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="book-category">Category *</label>
+                                <select id="book-category" required>
+                                    <option value="" disabled selected>Select a category</option>
+                                    <option value="Fiction">Fiction</option>
+                                    <option value="French Translation">French Translation</option>
+                                    <option value="Russian Translation Novel">Russian Translation Novel</option>
+                                    <option value="Tibet Translation">Tibet Translation</option>
+                                    <option value="Japan Translation">Japan Translation</option>
+                                    <option value="N.korea Translation">N.korea Translation</option>
+                                    <option value="English Translation Novel">English Translation Novel</option>
+                                    <option value="Science Fiction">Science Fiction</option>
+                                    <option value="Sinhala Novel">Sinhala Novel</option>
+                                    <option value="Indian Translation">Indian Translation</option>
+                                    <option value="Chinese Translation">Chinese Translation</option>
+                                    <option value="Italy Translation Novel">Italy Translation Novel</option>
+                                    <option value="African Translation">African Translation</option>
+                                    <option value="English Novel">English Novel</option>
+                                    <option value="Poetry">Poetry</option>
+                                    <option value="English Children's Stories">English Children's Stories</option>
+                                    <option value="Sinhala Short Stories">Sinhala Short Stories</option>
+                                    <option value="Other">Other</option>
+                                    <option value="Religious">Religious</option>
+                                    <option value="Miscellaneous">Miscellaneous</option>
+                                    <option value="English Translation Short Stories">English Translation Short Stories
+                                    </option>
+                                    <option value="English Translation Children">English Translation Children</option>
+                                    <option value="Russian Translation Short Stories">Russian Translation Short Stories
+                                    </option>
+                                    <option value="Children Sinhala">Children Sinhala</option>
+                                    <option value="Horror">Horror</option>
+                                    <option value="Children english">Children english</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="book-tags-input">Tags</label>
+                                    <div class="tags-input-container" id="tags-input-container">
+                                        <div class="tags-wrapper" id="tags-wrapper">
+                                            <!-- Tags will be dynamically inserted here -->
+                                            <input type="text" id="book-tags-input"
+                                                placeholder="Type a tag & press Enter or Comma">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Book</button>
+                                <button type="button" class="btn btn-secondary" id="form-cancel-btn">Clear /
+                                    Cancel</button>
+                            </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- View: Statistics -->
+            <section id="view-stats" class="view-section" style="display: none;">
+                <div class="form-card" style="max-width: 100%;">
+                    <h2 id="stats-title">Library Statistics</h2>
+                    <p class="subtitle">An overview of your collection.</p>
+
+                    <div class="stats-overview"
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+                        <div class="stat-card"
+                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                            <h3
+                                style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
+                                Total Books</h3>
+                            <div id="stat-total-books"
+                                style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
+                                0</div>
+                        </div>
+                        <div class="stat-card"
+                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                            <h3
+                                style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
+                                Total Authors</h3>
+                            <div id="stat-total-authors"
+                                style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
+                                0</div>
+                        </div>
+                        <div class="stat-card"
+                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                            <h3
+                                style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
+                                Unique Tags</h3>
+                            <div id="stat-total-tags"
+                                style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
+                                0</div>
+                        </div>
+                    </div>
+
+                    <div class="charts-container"
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-top: 3rem;">
+                        <div class="chart-wrapper"
+                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; display: flex; flex-direction: column; align-items: center;">
+                            <h3 style="margin-bottom: 1rem; font-family: 'Playfair Display', serif;">Books by Category
+                            </h3>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="categoryChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper"
+                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; display: flex; flex-direction: column; align-items: center;">
+                            <h3 style="margin-bottom: 1rem; font-family: 'Playfair Display', serif;">Books by Language
+                            </h3>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="languageChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top 15 Leaderboards -->
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-top: 3rem;">
+                        <div
+                            style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
+                            <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
+                                Authors</h3>
+                            <div id="stat-authors-list"></div>
+                        </div>
+                        <div
+                            style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
+                            <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
+                                Translators</h3>
+                            <div id="stat-translators-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- People Manager Section -->
+            <section id="view-people" class="view-section" style="display: none;">
+                <div class="form-card" style="max-width: 100%;">
+                    <h2>People Manager</h2>
+                    <p class="subtitle">Edit an author or translator name here to update it across all their books at
+                        once. You can also add their Sinhala name.</p>
+
+                    <div class="people-tabs" style="display:flex; gap:1rem; margin: 1.5rem 0 1rem;">
+                        <button class="btn btn-primary" id="show-authors-btn"
+                            onclick="showPeopleList('author')">Authors</button>
+                        <button class="btn btn-secondary" id="show-translators-btn"
+                            onclick="showPeopleList('translator')">Translators</button>
+                    </div>
+
+                    <div id="people-search-row" style="margin-bottom:1rem;">
+                        <input type="text" id="people-search" placeholder="Search by name..." class="search-input"
+                            style="max-width:400px; padding: 0.5rem 1rem;" oninput="filterPeopleList()">
+                    </div>
+
+                    <div id="people-list-container">
+                        <p style="color: var(--text-secondary);">Click Authors or Translators above to view the list.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="view-settings" class="view-section" style="display:none;">
+                <div class="form-card" style="max-width:100%;">
+                    <h2>⚙️ Settings</h2>
+                    <p class="subtitle">Customize the appearance of your library.</p>
+
+                    <!-- Theme Picker -->
+                    <div class="settings-section">
+                        <h3 class="settings-heading">🎨 Theme</h3>
+                        <div class="theme-swatch-grid" id="theme-swatch-grid">
+                            <!-- Swatches generated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Font Picker -->
+                    <div class="settings-section">
+                        <h3 class="settings-heading">🔤 Body Font</h3>
+                        <div class="font-card-grid" id="font-card-grid">
+                            <!-- Font cards generated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Category Colors Toggle -->
+                    <div class="settings-section">
+                        <h3 class="settings-heading">🎨 Category Color Coding</h3>
+                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem;">Show a colored
+                            left border on book cards based on their category.</p>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="category-colors-toggle"
+                                onchange="toggleCategoryColors(this.checked)">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label" id="cat-colors-label">Off</span>
+                        </label>
+                    </div>
+
+                    <!-- Font Size Sliders -->
+                    <div class="settings-section">
+                        <h3 class="settings-heading">📐 Font Sizes</h3>
+                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1.25rem;">Adjust sizes to
+                            suit your reading preference.</p>
+                        <div class="font-size-sliders">
+                            <div class="slider-row">
+                                <label>Book Number <span id="lbl-id-size"></span></label>
+                                <input type="range" min="10" max="22" step="1" id="slider-id-size"
+                                    oninput="updateFontSize('id',this.value)">
+                            </div>
+                            <div class="slider-row">
+                                <label>English Name <span id="lbl-title-size"></span></label>
+                                <input type="range" min="10" max="26" step="1" id="slider-title-size"
+                                    oninput="updateFontSize('title',this.value)">
+                            </div>
+                            <div class="slider-row">
+                                <label>Sinhala Name <span id="lbl-sinhala-size"></span></label>
+                                <input type="range" min="10" max="26" step="1" id="slider-sinhala-size"
+                                    oninput="updateFontSize('sinhala',this.value)">
+                            </div>
+                            <div class="slider-row">
+                                <label>Author Name <span id="lbl-author-size"></span></label>
+                                <input type="range" min="9" max="20" step="1" id="slider-author-size"
+                                    oninput="updateFontSize('author',this.value)">
+                            </div>
+                            <div class="slider-row">
+                                <label>Translator Name <span id="lbl-translator-size"></span></label>
+                                <input type="range" min="9" max="20" step="1" id="slider-translator-size"
+                                    oninput="updateFontSize('translator',this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Book added successfully!</div>
+
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>
