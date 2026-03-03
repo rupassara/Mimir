@@ -1,0 +1,1982 @@
+/* =========================================================================
+   Design System & Variables
+   ========================================================================= */
+:root {
+    /* Light Theme (Bookish & Warm) */
+    --bg-color: #fcfaf8;
+    --surface-color: #ffffff;
+    --text-primary: #2c2825;
+    --text-secondary: #6b635e;
+    --border-color: #e6dfd8;
+
+    --accent-primary: #8a5a44;
+    --accent-hover: #6d4534;
+    --accent-light: #f4eee8;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.08);
+
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'Inter', sans-serif;
+
+    --transition-speed: 0.3s;
+}
+
+[data-theme="dark"] {
+    /* Dark Theme (Deep, Study vibes) */
+    --bg-color: #1a1817;
+    --surface-color: #242120;
+    --text-primary: #f0ebe1;
+    --text-secondary: #a39c96;
+    --border-color: #3b3634;
+
+    --accent-primary: #c28b72;
+    --accent-hover: #d6a189;
+    --accent-light: #3d2f28;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="sepia"] {
+    /* Sepia Theme (Vintage Paper) */
+    --bg-color: #f4ecd8;
+    --surface-color: #e9dec1;
+    --text-primary: #433422;
+    --text-secondary: #5c4e3c;
+    --border-color: #d1bfae;
+
+    --accent-primary: #a65d3b;
+    --accent-hover: #8f4b2a;
+    --accent-light: #d1bfae;
+
+    --shadow-sm: 0 2px 4px rgba(67, 52, 34, 0.05);
+    --shadow-md: 0 4px 12px rgba(67, 52, 34, 0.08);
+    --shadow-lg: 0 12px 24px rgba(67, 52, 34, 0.12);
+}
+
+[data-theme="nord"] {
+    /* Nord Theme (Arctic/Cool) */
+    --bg-color: #2e3440;
+    --surface-color: #3b4252;
+    --text-primary: #eceff4;
+    --text-secondary: #e5e9f0;
+    --border-color: #4c566a;
+
+    --accent-primary: #88c0d0;
+    --accent-hover: #81a1c1;
+    --accent-light: #434c5e;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="forest"] {
+    /* Forest Theme (Deep green) */
+    --bg-color: #1b2b1f;
+    --surface-color: #243328;
+    --text-primary: #d7e8d9;
+    --text-secondary: #93b396;
+    --border-color: #345038;
+
+    --accent-primary: #56a85f;
+    --accent-hover: #44904d;
+    --accent-light: #2e4a32;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="ocean"] {
+    /* Ocean Theme (Deep Blue) */
+    --bg-color: #0d1b2a;
+    --surface-color: #152233;
+    --text-primary: #cce5ff;
+    --text-secondary: #88aacc;
+    --border-color: #1f3550;
+
+    --accent-primary: #4d9de0;
+    --accent-hover: #3a82c6;
+    --accent-light: #1a3048;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="crimson"] {
+    /* Crimson Theme (Dark red) */
+    --bg-color: #1c0f12;
+    --surface-color: #2b1519;
+    --text-primary: #f5dde0;
+    --text-secondary: #c9949a;
+    --border-color: #4a2028;
+
+    --accent-primary: #c0384a;
+    --accent-hover: #a62a3c;
+    --accent-light: #3d1820;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="purple"] {
+    /* Purple Night Theme */
+    --bg-color: #130d1f;
+    --surface-color: #1e1430;
+    --text-primary: #e6d9ff;
+    --text-secondary: #a990cc;
+    --border-color: #372654;
+
+    --accent-primary: #9d62d9;
+    --accent-hover: #8548c5;
+    --accent-light: #2b1a47;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="contrast"] {
+    /* High Contrast Light (Best for Sinhala readability) */
+    --bg-color: #f8f8f8;
+    --surface-color: #ffffff;
+    --text-primary: #111111;
+    --text-secondary: #333333;
+    --border-color: #aaaaaa;
+
+    --accent-primary: #0056d6;
+    --accent-hover: #0040aa;
+    --accent-light: #ddeeff;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.18);
+
+    /* Larger Sinhala font for contrast theme */
+    --sinhala-font-size: 1rem;
+    --sinhala-font-weight: 500;
+}
+
+[data-theme="rosegold"] {
+    --bg-color: #fff5f7;
+    --surface-color: #ffffff;
+    --text-primary: #3a1c24;
+    --text-secondary: #8c5a67;
+    --border-color: #e8c5ce;
+    --accent-primary: #c96b7e;
+    --accent-hover: #a8546a;
+    --accent-light: #fce8ed;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="solarized"] {
+    --bg-color: #002b36;
+    --surface-color: #073642;
+    --text-primary: #fdf6e3;
+    --text-secondary: #93a1a1;
+    --border-color: #0d4050;
+    --accent-primary: #268bd2;
+    --accent-hover: #2aa198;
+    --accent-light: #073642;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dracula"] {
+    --bg-color: #282a36;
+    --surface-color: #363948;
+    --text-primary: #f8f8f2;
+    --text-secondary: #bd93f9;
+    --border-color: #44475a;
+    --accent-primary: #ff79c6;
+    --accent-hover: #ff5cb8;
+    --accent-light: #44475a;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="tokyo"] {
+    --bg-color: #1a1b2e;
+    --surface-color: #24253d;
+    --text-primary: #c0caf5;
+    --text-secondary: #7aa2f7;
+    --border-color: #33354f;
+    --accent-primary: #7aa2f7;
+    --accent-hover: #5d85e8;
+    --accent-light: #33354f;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="catppuccin"] {
+    --bg-color: #1e1e2e;
+    --surface-color: #292938;
+    --text-primary: #cdd6f4;
+    --text-secondary: #a6adc8;
+    --border-color: #363651;
+    --accent-primary: #cba6f7;
+    --accent-hover: #b389e8;
+    --accent-light: #363651;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="mint"] {
+    --bg-color: #f0faf4;
+    --surface-color: #ffffff;
+    --text-primary: #1a3d2a;
+    --text-secondary: #5a7f69;
+    --border-color: #c3e0cc;
+    --accent-primary: #2e8b5a;
+    --accent-hover: #217a49;
+    --accent-light: #d9f0e3;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* =========================================================================
+   Reset & Base Styles
+   ========================================================================= */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    line-height: 1.6;
+    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+    min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* =========================================================================
+   Layout
+   ========================================================================= */
+.app-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+.app-header {
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--accent-primary);
+}
+
+.logo h1 {
+    font-size: 1.75rem;
+    letter-spacing: -0.5px;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.tabs {
+    display: flex;
+    background: var(--surface-color);
+    padding: 0.35rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background: var(--surface-color);
+    color: var(--accent-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+/* =========================================================================
+   View Section (Search & Grid)
+   ========================================================================= */
+.search-bar-container {
+    margin-bottom: 1.5rem;
+}
+
+.search-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.search-input-wrapper {
+    position: relative;
+    width: 100%;
+    flex-grow: 1;
+}
+
+.csv-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    color: var(--text-secondary);
+}
+
+#global-search {
+    width: 100%;
+    padding: 1rem 1rem 1rem 3rem;
+    font-size: 1.1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    background: var(--surface-color);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
+    font-family: var(--font-body);
+}
+
+#global-search:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.filters-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background: var(--surface-color);
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.filter-group label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+select {
+    padding: 0.5rem 2rem 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px;
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.stats {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Books Grid & List View */
+.books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.books-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 3rem;
+}
+
+.books-list .book-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    gap: 1.5rem;
+}
+
+.books-list .book-card .book-title {
+    margin-bottom: 0;
+    font-size: 1.1rem;
+    flex: 2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.books-list .book-card .book-author {
+    margin-bottom: 0;
+    flex: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.books-list .book-card .book-meta {
+    border-top: none;
+    padding-top: 0;
+    margin-bottom: 0;
+    margin-top: 0;
+    flex: 1.5;
+}
+
+.books-list .book-card .book-tags {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    flex: 2;
+    justify-content: flex-end;
+}
+
+.books-list .book-card .edit-book-btn {
+    top: unset !important;
+    transform: none !important;
+    right: unset !important;
+    position: static !important;
+}
+
+.books-list .book-card:hover .edit-book-btn {
+    opacity: 1;
+    transform: none !important;
+}
+
+.book-card {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.book-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent-primary);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.book-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.book-card:hover::before {
+    opacity: 1;
+}
+
+/* =========================================================================
+   List View — overrides for .books-list mode
+   ========================================================================= */
+.books-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.6rem !important;
+}
+
+.books-list .book-card {
+    display: grid !important;
+    grid-template-columns: 56px 1fr auto !important;
+    grid-template-rows: auto !important;
+    align-items: start !important;
+    padding: 0.85rem 1.25rem !important;
+    gap: 0 0.75rem !important;
+    min-height: 0 !important;
+    transform: none !important;
+    border-radius: var(--radius-md) !important;
+}
+
+.books-list .book-card:hover {
+    transform: none !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Column 1: ID */
+.books-list .book-id {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    margin: 0;
+    padding-top: 0.15rem;
+    align-self: start;
+    white-space: nowrap;
+}
+
+/* Column 2: Title block */
+.books-list .book-title {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 1rem !important;
+    margin-bottom: 0.1rem;
+}
+
+.books-list .book-sinhala-title {
+    grid-column: 2;
+    grid-row: 2;
+    display: block !important;
+    font-size: 0.85rem;
+    margin-top: 0;
+    margin-bottom: 0.25rem;
+}
+
+.books-list .book-author {
+    grid-column: 2;
+    grid-row: 3;
+    font-size: 0.85rem !important;
+    margin-bottom: 0.15rem;
+}
+
+.books-list .book-translator-row {
+    grid-column: 2;
+    grid-row: 4;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.15rem;
+}
+
+.books-list .book-tags {
+    grid-column: 2;
+    grid-row: 5;
+    padding-top: 0.4rem;
+    margin-top: 0.2rem;
+}
+
+/* Column 3: Meta (category + language) right-aligned */
+.books-list .book-meta {
+    grid-column: 3;
+    grid-row: 1 / 6;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    justify-content: flex-start !important;
+    gap: 0.35rem !important;
+    font-size: 0.8rem !important;
+    min-width: 180px;
+    white-space: nowrap;
+}
+
+.books-list .edit-book-btn {
+    grid-column: 6;
+    grid-row: 1;
+    position: static !important;
+    top: unset !important;
+    right: unset !important;
+    margin-left: 0;
+    margin-bottom: 0;
+    opacity: 1 !important;
+}
+
+/* =========================================================================
+   Stats Leaderboard Bars
+   ========================================================================= */
+.stat-leaderboard-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.65rem;
+    font-size: 0.85rem;
+}
+
+.stat-leaderboard-rank {
+    width: 22px;
+    text-align: right;
+    color: var(--text-secondary);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.stat-leaderboard-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.stat-leaderboard-bar-wrap {
+    width: 90px;
+    background: var(--border-color);
+    border-radius: 99px;
+    height: 6px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.stat-leaderboard-bar {
+    height: 100%;
+    background: var(--accent-primary);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+}
+
+.stat-leaderboard-count {
+    width: 28px;
+    text-align: right;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+
+.book-id {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.book-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+}
+
+.book-author {
+    color: var(--accent-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+}
+
+.book-meta {
+    margin-top: auto;
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-color);
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tag {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    background: var(--accent-light);
+    color: var(--text-primary);
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.book-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    border-top: 1px dashed var(--border-color);
+}
+
+.book-tag-chip {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.book-tag-chip svg {
+    width: 10px;
+    height: 10px;
+}
+
+.edit-book-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.book-card:hover .edit-book-btn {
+    opacity: 1;
+}
+
+.edit-book-btn:hover {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+    transform: scale(1.05);
+}
+
+/* Pagination */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 3rem;
+}
+
+#page-info {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+/* =========================================================================
+   Add Book Form Section
+   ========================================================================= */
+.form-card {
+    background: var(--surface-color);
+    padding: 2.5rem;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    max-width: 800px;
+    margin: 0 auto 3rem;
+    border: 1px solid var(--border-color);
+}
+
+.form-card h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+}
+
+.form-row {
+    margin-bottom: 1.5rem;
+}
+
+.form-row.split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.form-group label {
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+input[type="text"] {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+input[type="text"]:focus,
+select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* Tags Input Container */
+.tags-input-container {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-color);
+    transition: all 0.2s;
+    cursor: text;
+}
+
+.tags-input-container.focused {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.tags-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.tag-chip {
+    background: var(--accent-light);
+    color: var(--text-primary);
+    padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tag-remove {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.1rem;
+    border-radius: 50%;
+}
+
+.tag-remove:hover {
+    color: #e63946;
+    background: rgba(230, 57, 70, 0.1);
+}
+
+#book-tags-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    padding: 0.25rem;
+    font-size: 0.95rem;
+    min-width: 150px;
+    flex-grow: 1;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+}
+
+#book-tags-input:focus {
+    box-shadow: none;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Autocomplete styles */
+.autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+    box-shadow: var(--shadow-md);
+    list-style: none;
+    display: none;
+}
+
+.autocomplete-list li {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.95rem;
+}
+
+.autocomplete-list li:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-list li:hover {
+    background: var(--accent-light);
+    color: var(--accent-primary);
+}
+
+/* =========================================================================
+   Buttons & Utilities
+   ========================================================================= */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.btn-primary {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--surface-color);
+    border-color: var(--text-secondary);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--accent-primary);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(150%);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 1000;
+    font-weight: 500;
+}
+
+.toast.show {
+    transform: translateY(0);
+}
+
+/* Empty State */
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 2rem;
+    background: var(--surface-color);
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--border-color);
+    color: var(--text-secondary);
+}
+
+.empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* =========================================================================
+   Sinhala Book Title
+   ========================================================================= */
+.book-sinhala-title {
+    display: block;
+    font-size: var(--sinhala-font-size, 1.05rem);
+    font-weight: var(--sinhala-font-weight, 600);
+    color: var(--text-secondary);
+    margin-top: 0.2rem;
+    margin-bottom: 0.5rem;
+    font-style: normal;
+    line-height: 1.6;
+    letter-spacing: 0.01em;
+}
+
+/* =========================================================================
+   People Manager Table
+   ========================================================================= */
+.people-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.people-table th {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.people-table td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.people-table tr:last-child td {
+    border-bottom: none;
+}
+
+.people-table tr:hover td {
+    background: var(--accent-light);
+}
+
+.people-name-input,
+.people-sinhala-input {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-speed), background var(--transition-speed);
+}
+
+.people-name-input:focus,
+.people-sinhala-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background: var(--surface-color);
+}
+
+@media (max-width: 768px) {
+
+    .people-table th:nth-child(3),
+    .people-table td:nth-child(3) {
+        display: none;
+        /* hide count on mobile */
+    }
+}
+
+/* =========================================================================
+   Clickable Author / Translator Names
+   ========================================================================= */
+.book-author {
+    cursor: pointer;
+    transition: color var(--transition-speed);
+}
+
+.book-author:hover {
+    color: var(--accent-primary);
+    text-decoration: underline;
+}
+
+.clickable-name {
+    cursor: pointer;
+    transition: color var(--transition-speed);
+}
+
+.clickable-name:hover {
+    color: var(--accent-primary);
+    text-decoration: underline;
+}
+
+/* =========================================================================
+   Per-Page Selector (View All)
+   ========================================================================= */
+#per-page-select,
+.per-page-select {
+    appearance: none;
+    background: var(--surface-color);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: border-color var(--transition-speed), color var(--transition-speed);
+}
+
+#per-page-select:focus,
+.per-page-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+/* =========================================================================
+   Responsive (Mobile — max 768px)
+   ========================================================================= */
+@media (max-width: 768px) {
+
+    /* Header */
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 0 1rem;
+    }
+
+    .header-brand h1 {
+        font-size: 1.4rem;
+    }
+
+    .header-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    .tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+        width: 100%;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .theme-select-wrapper {
+        width: 100%;
+    }
+
+    .theme-select-wrapper select {
+        width: 100%;
+    }
+
+    /* Catalog / Search Bar */
+    .catalog-controls {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .search-wrapper {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .search-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .search-actions button {
+        flex: 1 1 auto;
+        min-width: 80px;
+    }
+
+    /* Filter Row */
+    .filters-container {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+
+    .filter-group {
+        width: 100%;
+    }
+
+    .filter-group select,
+    .filter-group label {
+        width: 100%;
+    }
+
+    #per-page-select,
+    .per-page-select {
+        width: 100%;
+    }
+
+    /* Pagination */
+    .pagination-controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        justify-content: center;
+        padding: 1rem 0.5rem;
+    }
+
+    /* Book List View — stack on mobile */
+    .books-list .book-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .books-list .book-id {
+        font-size: 0.7rem;
+    }
+
+    .books-list .book-title {
+        font-size: 0.95rem;
+    }
+
+    .books-list .book-meta {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    /* Book Grid View */
+    .books-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Form */
+    .form-row.split {
+        grid-template-columns: 1fr;
+    }
+
+    .form-section {
+        padding: 1.5rem 1rem;
+    }
+}
+
+/* Extra small phones */
+@media (max-width: 480px) {
+    .app-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .header-brand h1 {
+        font-size: 1.2rem;
+    }
+
+    .book-stats {
+        font-size: 0.75rem;
+    }
+}
+
+/* =========================================================================
+   Book ID — larger
+   ========================================================================= */
+.book-id {
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: var(--accent-primary) !important;
+    letter-spacing: 0.5px;
+}
+
+/* =========================================================================
+   List View — book-header-row (title + author + translator inline)
+   ========================================================================= */
+.book-header-row {
+    display: flex;
+    flex-direction: column;
+    /* column by default (grid/card view) */
+}
+
+.books-list .book-header-row {
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 0.6rem;
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.books-list .book-header-row .book-title {
+    margin-bottom: 0 !important;
+    font-size: 1rem !important;
+}
+
+.books-list .book-header-row .book-author {
+    font-size: 0.85rem !important;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+}
+
+.books-list .book-header-row .book-translator-row {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* Sinhala title stays on its own line below the header row */
+.books-list .book-sinhala-title {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+/* override grid rows to accommodate header-row as row 1 */
+.books-list .book-tags {
+    grid-row: 3 !important;
+}
+
+.books-list .book-meta {
+    grid-row: 1 / 4 !important;
+}
+
+/* =========================================================================
+   User-adjustable Font Size CSS Variables (controlled via Settings sliders)
+   ========================================================================= */
+:root {
+    --user-id-size: 0.95rem;
+    --user-title-size: 1.1rem;
+    --user-sinhala-size: 1.05rem;
+    --user-author-size: 0.9rem;
+    --user-translator-size: 0.82rem;
+}
+
+.book-id {
+    font-size: var(--user-id-size) !important;
+    font-weight: 700 !important;
+    color: var(--accent-primary) !important;
+    letter-spacing: 0.5px;
+}
+
+.book-title {
+    font-size: var(--user-title-size) !important;
+}
+
+.book-sinhala-title {
+    font-size: var(--user-sinhala-size) !important;
+    font-weight: 600;
+}
+
+.book-author {
+    font-size: var(--user-author-size) !important;
+}
+
+.book-translator-row {
+    font-size: var(--user-translator-size) !important;
+}
+
+/* =========================================================================
+   List View — proper 6-column grid
+   Columns: [ID] [Title+Sinhala] [Author] [Translator] [Category+Lang] [Edit]
+   ========================================================================= */
+.books-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+}
+
+.books-list .book-card {
+    display: grid !important;
+    grid-template-columns: 64px 1fr 160px 240px 210px 40px !important;
+    align-items: center !important;
+    column-gap: 1rem !important;
+    padding: 0.75rem 1.25rem !important;
+    min-height: 0 !important;
+    position: relative;
+}
+
+/* Prevent any child from blowing out its grid track */
+.books-list .book-card>* {
+    min-width: 0 !important;
+}
+
+/* Hover — no lift in list mode */
+.books-list .book-card:hover {
+    transform: none !important;
+}
+
+/* Col 1 — ID */
+.books-list .book-id {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    justify-self: start;
+    align-self: center;
+    white-space: nowrap;
+}
+
+/* Col 2 — Title + Sinhala (book-main) */
+.books-list .book-main {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: center;
+}
+
+.books-list .book-main .book-title {
+    font-size: var(--user-title-size, 1rem) !important;
+    margin-bottom: 0.1rem !important;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.books-list .book-main .book-sinhala-title {
+    margin-top: 0.1rem !important;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Col 3 — Author */
+.books-list .book-author {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    align-self: center;
+    font-size: var(--user-author-size, 0.88rem) !important;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Col 4 — Translator */
+.books-list .book-translator-row,
+.books-list .book-translator-empty {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+    align-self: center;
+    font-size: var(--user-translator-size, 0.82rem) !important;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.books-list .translator-label {
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+/* Col 5 — Category + Language */
+.books-list .book-meta {
+    grid-column: 5 !important;
+    grid-row: 1 !important;
+    align-self: center;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    gap: 0.3rem !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap;
+}
+
+/* Col 6 — Edit button — override global position:absolute */
+.books-list .edit-book-btn {
+    grid-column: 6 !important;
+    grid-row: 1 !important;
+    position: static !important;
+    top: unset !important;
+    right: unset !important;
+    align-self: center !important;
+    justify-self: center !important;
+    opacity: 1 !important;
+    margin: 0 !important;
+}
+
+/* Hide tags in list mode (too cluttered) */
+.books-list .book-tags {
+    display: none !important;
+}
+
+/* Mobile: collapse to simpler layout under 768px */
+@media (max-width: 768px) {
+    .books-list .book-card {
+        grid-template-columns: 48px 1fr auto !important;
+        grid-template-rows: auto auto auto !important;
+    }
+
+    .books-list .book-id {
+        grid-column: 1 !important;
+        grid-row: 1 / 4 !important;
+        align-self: start !important;
+    }
+
+    .books-list .book-main {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+    }
+
+    .books-list .book-author {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+    }
+
+    .books-list .book-translator-row,
+    .books-list .book-translator-empty {
+        grid-column: 2 !important;
+        grid-row: 3 !important;
+    }
+
+    .books-list .book-meta {
+        grid-column: 3 !important;
+        grid-row: 1 !important;
+    }
+
+    .books-list .edit-book-btn {
+        grid-column: 3 !important;
+        grid-row: 2 !important;
+    }
+}
+
+
+.category-colors-on .book-card {
+    border-left: 4px solid var(--cat-color, var(--border-color)) !important;
+}
+
+[data-category="Fiction"] {
+    --cat-color: #4f46e5;
+}
+
+/* Indigo */
+[data-category="French Translation"] {
+    --cat-color: #ef4444;
+}
+
+/* Red */
+[data-category="Russian Translation Novel"] {
+    --cat-color: #f97316;
+}
+
+/* Orange */
+[data-category="Russian Translation Short Stories"] {
+    --cat-color: #fb923c;
+}
+
+/* Light Orange */
+[data-category="English Translation Novel"] {
+    --cat-color: #0ea5e9;
+}
+
+/* Sky Blue */
+[data-category="English Translation Short Stories"] {
+    --cat-color: #38bdf8;
+}
+
+/* Light Sky Blue */
+[data-category="English Translation Children"] {
+    --cat-color: #22d3ee;
+}
+
+/* Cyan */
+[data-category="English Novel"] {
+    --cat-color: #6366f1;
+}
+
+/* Blue-Indigo */
+[data-category="English Children's Stories"] {
+    --cat-color: #06b6d4;
+}
+
+/* Cyan-Blue */
+[data-category="Science Fiction"] {
+    --cat-color: #8b5cf6;
+}
+
+/* Violet */
+[data-category="Sinhala Novel"] {
+    --cat-color: #10b981;
+}
+
+/* Emerald */
+[data-category="Sinhala Short Stories"] {
+    --cat-color: #34d399;
+}
+
+/* Light Emerald */
+[data-category="Children Sinhala"] {
+    --cat-color: #6ee7b7;
+}
+
+/* Mint */
+[data-category="Indian Translation"] {
+    --cat-color: #eab308;
+}
+
+/* Yellow-Gold */
+[data-category="Chinese Translation"] {
+    --cat-color: #f59e0b;
+}
+
+/* Amber */
+[data-category="Japan Translation"] {
+    --cat-color: #f43f5e;
+}
+
+/* Rose */
+[data-category="African Translation"] {
+    --cat-color: #84cc16;
+}
+
+/* Lime */
+[data-category="Italy Translation Novel"] {
+    --cat-color: #64748b;
+}
+
+/* Slate */
+[data-category="N.korea Translation"] {
+    --cat-color: #94a3b8;
+}
+
+/* Blue-Gray */
+[data-category="Tibet Translation"] {
+    --cat-color: #cc6633;
+}
+
+/* Terra Cotta */
+[data-category="Poetry"] {
+    --cat-color: #d946ef;
+}
+
+/* Fuchsia */
+[data-category="Religious"] {
+    --cat-color: #fbbf24;
+}
+
+/* Amber-Yellow */
+[data-category="Horror"] {
+    --cat-color: #7f1d1d;
+}
+
+/* Dark Red */
+[data-category="Children english"] {
+    --cat-color: #0891b2;
+}
+
+/* Teal */
+[data-category="Miscellaneous"] {
+    --cat-color: #cbd5e1;
+}
+
+/* Light Slate */
+[data-category="Other"] {
+    --cat-color: #94a3b8;
+}
+
+/* Slate-Gray */
+
+[data-category="Children english"] {
+    --cat-color: #56cfe1;
+}
+
+[data-category="Miscellaneous"] {
+    --cat-color: #8ecae6;
+}
+
+[data-category="Other"] {
+    --cat-color: #adb5bd;
+}
+
+/* =========================================================================
+   Settings Page
+   ========================================================================= */
+.settings-section {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section:last-child {
+    border-bottom: none;
+}
+
+.settings-heading {
+    font-size: 1.1rem;
+    font-family: var(--font-heading);
+    margin-bottom: 1.25rem;
+    color: var(--text-primary);
+}
+
+/* Theme Swatches */
+.theme-swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.85rem;
+}
+
+.theme-swatch {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: border-color 0.2s, transform 0.2s;
+    box-shadow: var(--shadow-sm);
+}
+
+.theme-swatch:hover {
+    transform: translateY(-3px);
+}
+
+.theme-swatch.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+.theme-swatch-preview {
+    height: 56px;
+    display: flex;
+    align-items: flex-end;
+    padding: 6px;
+    gap: 4px;
+}
+
+.swatch-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.theme-swatch-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.4rem 0.6rem;
+    background: var(--surface-color);
+    color: var(--text-primary);
+    text-align: center;
+}
+
+/* Font Cards */
+.font-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.85rem;
+}
+
+.font-card {
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem 0.85rem;
+    cursor: pointer;
+    background: var(--surface-color);
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    text-align: center;
+}
+
+.font-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.font-card.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+.font-card-preview {
+    font-size: 1.35rem;
+    line-height: 1.3;
+    margin-bottom: 0.4rem;
+    color: var(--text-primary);
+}
+
+.font-card-name {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-switch input {
+    display: none;
+}
+
+.toggle-slider {
+    width: 46px;
+    height: 26px;
+    background: var(--border-color);
+    border-radius: 99px;
+    position: relative;
+    transition: background 0.3s;
+    flex-shrink: 0;
+}
+
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked+.toggle-slider {
+    background: var(--accent-primary);
+}
+
+.toggle-switch input:checked+.toggle-slider::after {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* Font Size Sliders */
+.font-size-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 500px;
+}
+
+.slider-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    align-items: center;
+    gap: 1rem;
+}
+
+.slider-row label {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.slider-row label span {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--accent-primary);
+    background: var(--accent-light);
+    padding: 1px 6px;
+    border-radius: 99px;
+    min-width: 32px;
+    text-align: center;
+}
+
+.slider-row input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+    height: 4px;
+}
