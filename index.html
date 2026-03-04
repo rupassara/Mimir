@@ -519,13 +519,23 @@
                     </div>
                     <div class="slider-row">
                         <label>Author Name <span id="lbl-author-size"></span></label>
-                        <input type="range" min="9" max="20" step="1" id="slider-author-size"
+                        <input type="range" min="9" max="25" step="1" id="slider-author-size"
                             oninput="updateFontSize('author',this.value)">
                     </div>
                     <div class="slider-row">
+                        <label>Author Sinhala Name <span id="lbl-authorSin-size"></span></label>
+                        <input type="range" min="9" max="25" step="1" id="slider-authorSin-size"
+                            oninput="updateFontSize('authorSin',this.value)">
+                    </div>
+                    <div class="slider-row">
                         <label>Translator Name <span id="lbl-translator-size"></span></label>
-                        <input type="range" min="9" max="20" step="1" id="slider-translator-size"
+                        <input type="range" min="9" max="25" step="1" id="slider-translator-size"
                             oninput="updateFontSize('translator',this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <label>Translator Sinhala Name <span id="lbl-translatorSin-size"></span></label>
+                        <input type="range" min="9" max="25" step="1" id="slider-translatorSin-size"
+                            oninput="updateFontSize('translatorSin',this.value)">
                     </div>
                 </div>
             </div>
@@ -551,6 +561,16 @@
                             <button id="export-csv" class="btn btn-secondary csv-btn"
                                 style="flex:1; justify-content:center;">Export</button>
                         </div>
+                    </div>
+
+                    <!-- Tag Management -->
+                    <div class="mgmt-sub-section">
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1rem;">🏷️ Tag Management
+                        </h4>
+                        <button class="btn btn-secondary auth-required" onclick="openTagMgmtModal()"
+                            style="display:flex; align-items:center; gap:0.5rem; width:100%; justify-content:center;">
+                            Manage Tags
+                        </button>
                     </div>
 
                     <!-- Library Management -->
@@ -610,6 +630,20 @@
                         style="width:100%; padding: 0.8rem; font-weight: 600;">Sign In</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Tag Management Modal -->
+    <div id="tag-mgmt-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>🏷️ Manage Tags</h2>
+                <button class="close-modal" onclick="toggleTagMgmtModal(false)">&times;</button>
+            </div>
+            <p class="subtitle" style="margin-bottom: 1rem;">Update or delete existing tags across all books.</p>
+            <div id="tags-table-container">
+                <p class="loading">Loading tags...</p>
+            </div>
         </div>
     </div>
 
