@@ -105,17 +105,32 @@ async function saveLending(lendingRecord) {
     }
 }
 
-async function markReturned(lendId) {
+async function markReturned(lendId, bookId = null) {
     if (!currentUser) return;
     try {
         const lending = lendings.find(l => l.id === lendId);
         if (!lending) return;
 
-        lending.status = 'returned';
-        lending.returnDate = new Date().toISOString().split('T')[0];
+        if (bookId) {
+            // Mark individual book as returned
+            const book = lending.books.find(b => b.id === bookId);
+            if (book) book.returned = true;
+
+            // Check if all books are now returned
+            const allReturned = lending.books.every(b => b.returned);
+            if (allReturned) {
+                lending.status = 'returned';
+                lending.returnDate = new Date().toISOString().split('T')[0];
+            }
+        } else {
+            // Mark entire record as returned
+            lending.status = 'returned';
+            lending.returnDate = new Date().toISOString().split('T')[0];
+            lending.books.forEach(b => b.returned = true);
+        }
 
         await setDoc(doc(db, "lendings", lendId), lending);
-        showToast("Book(s) marked as returned.");
+        showToast(bookId ? "Book marked as returned." : "All books marked as returned.");
 
         // Refresh everything
         renderLendingPage();
@@ -126,21 +141,73 @@ async function markReturned(lendId) {
         showToast("Error updating record. " + error.message);
     }
 }
-window.markReturned = async function (lendId) {
+
+window.markReturned = async function (lendId, bookId = null) {
     if (!currentUser) return showToast("Login required to mark as returned.");
-    await markReturned(lendId);
+    await markReturned(lendId, bookId);
 };
+
+async function deleteLendingRecord(lendId) {
+    if (!currentUser) return;
+    if (!confirm("Are you sure you want to delete this lending record permanently?")) return;
+
+    try {
+        await deleteDoc(doc(db, "lendings", lendId));
+        lendings = lendings.filter(l => l.id !== lendId);
+        showToast("Lending record deleted.");
+        renderLendingPage();
+        renderStats();
+        renderBooks();
+    } catch (error) {
+        console.error("Error deleting lending:", error);
+        showToast("Failed to delete record.");
+    }
+}
+window.deleteLendingRecord = deleteLendingRecord;
+
+async function clearLendingHistory() {
+    if (!currentUser) return;
+    const history = lendings.filter(l => l.status === 'returned');
+    if (history.length === 0) return showToast("No history to clear.");
+
+    if (!confirm(`Are you sure you want to delete all ${history.length} returned records permanently?`)) return;
+
+    try {
+        const BATCH_SIZE = 400;
+        for (let i = 0; i < history.length; i += BATCH_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = history.slice(i, i + BATCH_SIZE);
+            chunk.forEach(l => {
+                batch.delete(doc(db, "lendings", l.id));
+            });
+            await batch.commit();
+        }
+
+        lendings = lendings.filter(l => l.status !== 'returned');
+        showToast("Lending history cleared.");
+        renderLendingPage();
+        renderStats();
+    } catch (error) {
+        console.error("Error clearing history:", error);
+        showToast("Failed to clear history.");
+    }
+}
+window.clearLendingHistory = clearLendingHistory;
 
 async function saveData() {
     const cleanBooks = books.filter(b => b !== null && b !== undefined);
     try {
-        const batch = writeBatch(db);
-        cleanBooks.forEach(book => {
-            // Use the book ID as the document ID for absolute consistency
-            const docRef = doc(db, "books", String(book.id));
-            batch.set(docRef, book);
-        });
-        await batch.commit();
+        const BATCH_SIZE = 400;
+        for (let i = 0; i < cleanBooks.length; i += BATCH_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = cleanBooks.slice(i, i + BATCH_SIZE);
+            chunk.forEach(book => {
+                // Use the book ID as the document ID for absolute consistency
+                const docRef = doc(db, "books", String(book.id));
+                batch.set(docRef, book);
+            });
+            await batch.commit();
+        }
     } catch (e) {
         console.error("Failed to save to Firebase Firestore:", e);
         showToast("Error saving to cloud database.");
@@ -963,7 +1030,7 @@ function exportToCsv() {
         return;
     }
 
-    const headers = ["ID", "Name", "Sinhala Name", "Author", "Translator", "Language", "Category", "Tags"];
+    const headers = ["ID", "Name", "Sinhala Name", "Author", "Author Sinhala Name", "Translator", "Translator Sinhala Name", "Language", "Category", "Tags"];
 
     const escapeCsv = (val) => {
         if (!val) return '""';
@@ -977,7 +1044,9 @@ function exportToCsv() {
             escapeCsv(book.name),
             escapeCsv(book.sinhalaName || ''),
             escapeCsv(book.author),
-            escapeCsv(book.translator),
+            escapeCsv(book.authorSinhala || ''),
+            escapeCsv(book.translator || ''),
+            escapeCsv(book.translatorSinhala || ''),
             escapeCsv(book.language),
             escapeCsv(book.category),
             escapeCsv((book.tags || []).join(', '))
@@ -1001,7 +1070,7 @@ function exportToCsv() {
         ].join(',');
     });
 
-    const csvContent = [
+    const csvContent = "\uFEFF" + [
         headers.join(','),
         ...rows,
         ["TYPE", "Borrower/Lendee", "Date", "Status", "Returned", "BookIDs (separated by ;) "].join(','),
@@ -1101,7 +1170,9 @@ function parseCsvData(csvText) {
                 name: (bookRecord.name || '').trim(),
                 sinhalaName: (bookRecord['sinhala name'] || bookRecord['sinhala_name'] || bookRecord['sinhalaname'] || '').trim(),
                 author: authorName,
+                authorSinhala: (bookRecord['author sinhala name'] || bookRecord['author_sinhala_name'] || bookRecord['authorsinhalaname'] || '').trim(),
                 translator: translatorName,
+                translatorSinhala: (bookRecord['translator sinhala name'] || bookRecord['translator_sinhala_name'] || bookRecord['translatorsinhalaname'] || '').trim(),
                 language: bookRecord.language || 'Other',
                 category: categoryIndex !== -1 ? (rowData[categoryIndex] || 'Other') : 'Other',
                 tags: bookRecord.tags ? bookRecord.tags.split(';').map(t => t.trim()).filter(t => t) : []
@@ -1940,18 +2011,27 @@ function renderLendingTable(data, isActive) {
                         <td style="font-weight:600;">${escapeHTML(l.borrower)}</td>
                         <td>
                             <div class="lending-books-list">
-                                ${l.books.map(b => `<div class="lending-book-item"><span class="lending-book-id">#${b.id}</span> ${escapeHTML(b.name)}</div>`).join('')}
+                                ${l.books.map(b => `
+                                    <div class="lending-book-item ${b.returned ? 'returned' : ''}">
+                                        <div style="display:flex; align-items:center; gap:0.5rem; justify-content:space-between; width:100%;">
+                                            <span><span class="lending-book-id">#${b.id}</span> ${escapeHTML(b.name)}</span>
+                                            ${(isActive && !b.returned) ? `<button class="btn-icon-tiny" title="Return this book" onclick="markReturned('${l.id}', ${b.id})">↩️</button>` : ''}
+                                        </div>
+                                    </div>`).join('')}
                             </div>
                         </td>
                         <td style="font-size:0.85rem;">${l.lendDate}</td>
                         <td>
                             ${isActive ? `<span class="days-count ${dayClass}">${days} days</span>` : `<span style="font-size:0.85rem;">${l.returnDate}</span>`}
                         </td>
-                        ${isActive ? `
                         <td>
-                            <button class="btn btn-secondary btn-return auth-required" onclick="markReturned('${l.id}')">Return</button>
+                            <div style="display:flex; gap:0.5rem;">
+                                ${isActive ? `<button class="btn btn-secondary btn-return auth-required" onclick="markReturned('${l.id}')">Return All</button>` : ''}
+                                <button class="btn btn-icon auth-required" title="Delete record" onclick="deleteLendingRecord('${l.id}')">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                </button>
+                            </div>
                         </td>
-                        ` : ''}
                     </tr>
                 `}).join('')}
             </tbody>
