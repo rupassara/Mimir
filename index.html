@@ -123,6 +123,17 @@
                             <option value="">All Languages</option>
                         </select>
                     </div>
+
+                    <!-- Language Toggle (Both/Eng/Sin) -->
+                    <div class="filter-group">
+                        <label>Display Mode</label>
+                        <div class="language-toggle" id="view-mode-toggle">
+                            <button class="lang-btn active" data-lang="both" title="Show Both Languages">Both</button>
+                            <button class="lang-btn" data-lang="eng" title="English Only">Eng</button>
+                            <button class="lang-btn" data-lang="sin" title="Sinhala Only">සිං</button>
+                        </div>
+                    </div>
+
                     <div class="filter-group">
                         <div class="stats" id="book-stats" style="padding-top: 1.8rem;">
                             Showing 0 books
@@ -176,11 +187,26 @@
                                     placeholder="e.g. F. Scott Fitzgerald">
                                 <ul class="autocomplete-list" id="autocomplete-author"></ul>
                             </div>
+                            <div class="form-group">
+                                <label for="book-author-sinhala">Author (Sinhala) <span
+                                        style="font-weight:400; opacity:0.6">(සිංහල නම)</span></label>
+                                <input type="text" id="book-author-sinhala" autocomplete="off" lang="si"
+                                    placeholder="e.g. එෆ්. ස්කොට් ෆිට්ස්ජෙරල්ඩ්">
+                            </div>
+                        </div>
+
+                        <div class="form-row split">
                             <div class="form-group autocomplete">
                                 <label for="book-translator">Translator</label>
                                 <input type="text" id="book-translator" autocomplete="off"
                                     placeholder="Leave blank if none">
                                 <ul class="autocomplete-list" id="autocomplete-translator"></ul>
+                            </div>
+                            <div class="form-group">
+                                <label for="book-translator-sinhala">Translator (Sinhala) <span
+                                        style="font-weight:400; opacity:0.6">(සිංහල නම)</span></label>
+                                <input type="text" id="book-translator-sinhala" autocomplete="off" lang="si"
+                                    placeholder="e.g. සිංහල පරිවර්තකයා">
                             </div>
                         </div>
 
@@ -227,343 +253,331 @@
                                     <option value="Children english">Children english</option>
                                 </select>
                             </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="book-tags-input">Tags</label>
-                                    <div class="tags-input-container" id="tags-input-container">
-                                        <div class="tags-wrapper" id="tags-wrapper">
-                                            <!-- Tags will be dynamically inserted here -->
-                                            <input type="text" id="book-tags-input" autocomplete="off"
-                                                placeholder="Type a tag & press Enter or Comma">
-                                        </div>
-                                    </div>
-                                    <ul class="autocomplete-list" id="autocomplete-tags"></ul>
-                                </div>
-                            </div>
+                        </div>
 
-                            <div class="form-actions">
-                                <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Book</button>
-                                <button type="button" class="btn btn-secondary" id="form-cancel-btn">Clear /
-                                    Cancel</button>
-                                <button type="button" class="btn btn-danger hidden" id="delete-book-btn">Delete
-                                    Book</button>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="book-tags-input">Tags <span style="font-weight:400; opacity:0.6">(press
+                                        Enter or comma to add)</span></label>
+                                <div class="tags-input-container" id="tags-input-container">
+                                    <div class="tags-wrapper" id="tags-wrapper">
+                                        <input type="text" id="book-tags-input"
+                                            placeholder="e.g. Bestseller, Classic..." autocomplete="off">
+                                    </div>
+                                </div>
+                                <ul class="autocomplete-list" id="autocomplete-tags"></ul>
                             </div>
+                        </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Book</button>
+                    <button type="button" class="btn btn-secondary" id="form-cancel-btn">Clear /
+                        Cancel</button>
+                    <button type="button" class="btn btn-danger hidden" id="delete-book-btn">Delete
+                        Book</button>
+                </div>
+                </form>
+    </div>
+    </section>
+
+    <!-- View: Statistics -->
+    <section id="view-stats" class="view-section" style="display: none;">
+        <div class="form-card" style="max-width: 100%;">
+            <h2 id="stats-title">Library Statistics</h2>
+            <p class="subtitle">An overview of your collection.</p>
+
+            <div class="stats-overview"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+                <div class="stat-card"
+                    style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                    <h3
+                        style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
+                        Total Books</h3>
+                    <div id="stat-total-books"
+                        style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
+                        0</div>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                    <h3
+                        style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
+                        Total Authors</h3>
+                    <div id="stat-total-authors"
+                        style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
+                        0</div>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                    <h3
+                        style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
+                        Unique Tags</h3>
+                    <div id="stat-total-tags"
+                        style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
+                        0</div>
+                </div>
+            </div>
+
+            <div class="charts-container"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-top: 3rem;">
+                <div class="chart-wrapper"
+                    style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; display: flex; flex-direction: column; align-items: center;">
+                    <h3 style="margin-bottom: 1rem; font-family: 'Playfair Display', serif;">Books by Category
+                    </h3>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-wrapper"
+                    style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; display: flex; flex-direction: column; align-items: center;">
+                    <h3 style="margin-bottom: 1rem; font-family: 'Playfair Display', serif;">Books by Language
+                    </h3>
+                    <div id="language-composition-chart">
+                        <canvas id="languageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-card glass" style="grid-column: 1 / -1; margin-top: 1.5rem;">
+                <h3>🏷️ Tags Directory</h3>
+                <p class="subtitle" style="margin-bottom: 1rem;">All tags currently in use across the library.</p>
+                <div id="tags-directory-container"></div>
+            </div>
+
+            <!-- Top 15 Leaderboards -->
+            <div
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-top: 3rem;">
+                <div
+                    style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
+                    <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
+                        Authors</h3>
+                    <div id="stat-authors-list"></div>
+                </div>
+                <div
+                    style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
+                    <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
+                        Translators</h3>
+                    <div id="stat-translators-list"></div>
+                </div>
+            </div>
+
+            <!-- Lending Statistics Overview -->
+            <div
+                style="margin-top: 3rem; background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
+                <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">📖 Lending Overview
+                </h3>
+                <div id="stat-lending-summary"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                    <!-- Lending statistics will be rendered here by JS -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- People Manager Section -->
+    <section id="view-people" class="view-section" style="display: none;">
+        <div class="form-card" style="max-width: 100%;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                <div>
+                    <h2 id="people-title">👥 Authors</h2>
+                    <p class="subtitle" id="people-subtitle">Manage and merge duplicate author profiles.</p>
+                </div>
+                <div class="search-bar" style="max-width:300px; width:100%;">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                    </svg>
+                    <input type="text" id="people-search" placeholder="Search names..." class="search-input"
+                        oninput="renderPeopleList()">
+                </div>
+            </div>
+
+            <div id="people-list-container"></div>
+        </div>
+    </section>
+
+    <!-- Lending Section -->
+    <section id="view-lending" class="view-section" style="display: none;">
+        <div class="form-card" style="max-width: 100%;">
+            <h2>Lending Management</h2>
+            <p class="subtitle">Track books lent to friends and family.</p>
+
+            <div class="lending-container"
+                style="display: grid; grid-template-columns: 350px 1fr; gap: 2rem; margin-top: 1.5rem;">
+                <!-- Add Lending Form -->
+                <div class="lending-form-sticky">
+                    <form id="add-lending-form" class="card"
+                        style="padding: 1.5rem; background: var(--bg-color); border-radius: var(--radius-lg); border: 1px solid var(--border-color);">
+                        <h3 style="margin-top:0; margin-bottom:1rem; font-size:1.1rem;">Record New Lending</h3>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label for="lendee-name">Borrower Name *</label>
+                            <input type="text" id="lendee-name" required placeholder="Borrower's name"
+                                class="search-input" style="width:100%;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label for="lend-date">Lend Date *</label>
+                            <input type="date" id="lend-date" required class="search-input" style="width:100%;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label>Select Books *</label>
+                            <div class="multi-select-container" style="position:relative;">
+                                <div class="tags-input-container" id="lending-books-container"
+                                    style="min-height: 44px; padding: 4px 8px;">
+                                    <div class="tags-wrapper" id="lending-books-wrapper" style="gap: 4px;">
+                                        <input type="text" id="lending-book-search" placeholder="ID or name..."
+                                            style="min-width: 80px; flex:1;" autocomplete="off"
+                                            oninput="updateLendingAutocomplete(this.value)">
+                                    </div>
+                                </div>
+                                <ul id="lending-search-results" class="autocomplete-list"
+                                    style="display:none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1000;">
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="form-actions" style="display:flex; gap:0.5rem;">
+                            <button type="submit" class="btn btn-primary" style="flex:1;">Save</button>
+                            <button type="button" class="btn btn-secondary" onclick="resetLendingForm()">Clear</button>
+                        </div>
                     </form>
                 </div>
-            </section>
 
-            <!-- View: Statistics -->
-            <section id="view-stats" class="view-section" style="display: none;">
-                <div class="form-card" style="max-width: 100%;">
-                    <h2 id="stats-title">Library Statistics</h2>
-                    <p class="subtitle">An overview of your collection.</p>
-
-                    <div class="stats-overview"
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
-                        <div class="stat-card"
-                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
-                            <h3
-                                style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
-                                Total Books</h3>
-                            <div id="stat-total-books"
-                                style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
-                                0</div>
-                        </div>
-                        <div class="stat-card"
-                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
-                            <h3
-                                style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
-                                Total Authors</h3>
-                            <div id="stat-total-authors"
-                                style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
-                                0</div>
-                        </div>
-                        <div class="stat-card"
-                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
-                            <h3
-                                style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
-                                Unique Tags</h3>
-                            <div id="stat-total-tags"
-                                style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
-                                0</div>
-                        </div>
+                <!-- Lending Tables -->
+                <div class="lending-content">
+                    <h3 style="margin-top:0;">📖 Active Lendings</h3>
+                    <div id="active-lendings-table-container">
+                        <p class="empty-state">No active records found.</p>
                     </div>
 
-                    <div class="charts-container"
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-top: 3rem;">
-                        <div class="chart-wrapper"
-                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; display: flex; flex-direction: column; align-items: center;">
-                            <h3 style="margin-bottom: 1rem; font-family: 'Playfair Display', serif;">Books by Category
-                            </h3>
-                            <div style="position: relative; height: 300px; width: 100%;">
-                                <canvas id="categoryChart"></canvas>
-                            </div>
+                    <details style="margin-top: 2rem;">
+                        <summary style="cursor:pointer; font-weight:600; color:var(--text-secondary);">History
+                            (Returned)</summary>
+                        <div id="returned-lendings-table-container" style="margin-top: 1rem;">
+                            <p class="empty-state">No history yet.</p>
                         </div>
-                        <div class="chart-wrapper"
-                            style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; display: flex; flex-direction: column; align-items: center;">
-                            <h3 style="margin-bottom: 1rem; font-family: 'Playfair Display', serif;">Books by Language
-                            </h3>
-                            <div style="position: relative; height: 300px; width: 100%;">
-                                <canvas id="languageChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </section>
 
-                    <!-- Top 15 Leaderboards -->
-                    <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-top: 3rem;">
-                        <div
-                            style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
-                            <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
-                                Authors</h3>
-                            <div id="stat-authors-list"></div>
-                        </div>
-                        <div
-                            style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
-                            <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
-                                Translators</h3>
-                            <div id="stat-translators-list"></div>
-                        </div>
-                    </div>
+    <!-- Settings Section -->
+    <section id="view-settings" class="view-section" style="display:none;">
+        <div class="form-card" style="max-width:100%;">
+            <h2>⚙️ Settings</h2>
+            <p class="subtitle">Customize the appearance of your library.</p>
 
-                    <!-- Lending Statistics Overview -->
-                    <div
-                        style="margin-top: 3rem; background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
-                        <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">📖 Lending Overview
-                        </h3>
-                        <div id="stat-lending-summary"
-                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
-                            <!-- Lending statistics will be rendered here by JS -->
-                        </div>
+            <!-- Theme Picker -->
+            <div class="settings-section">
+                <h3 class="settings-heading">🎨 Theme</h3>
+                <div class="theme-swatch-grid" id="theme-swatch-grid">
+                    <!-- Swatches generated by JS -->
+                </div>
+            </div>
+
+            <!-- Font Picker -->
+            <div class="settings-section">
+                <h3 class="settings-heading">🔤 Body Font</h3>
+                <div class="font-card-grid" id="font-card-grid">
+                    <!-- Font cards generated by JS -->
+                </div>
+            </div>
+
+            <!-- Category Colors Toggle -->
+            <div class="settings-section">
+                <h3 class="settings-heading">🎨 Category Color Coding</h3>
+                <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem;">Show a colored
+                    left border on book cards based on their category.</p>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="category-colors-toggle" onchange="toggleCategoryColors(this.checked)">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label" id="cat-colors-label">Off</span>
+                </label>
+            </div>
+
+            <!-- Font Size Sliders -->
+            <div class="settings-section">
+                <h3 class="settings-heading">📐 Font Sizes</h3>
+                <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1.25rem;">Adjust sizes to
+                    suit your reading preference.</p>
+                <div class="font-size-sliders">
+                    <div class="slider-row">
+                        <label>Book Number <span id="lbl-id-size"></span></label>
+                        <input type="range" min="10" max="22" step="1" id="slider-id-size"
+                            oninput="updateFontSize('id',this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <label>English Name <span id="lbl-title-size"></span></label>
+                        <input type="range" min="10" max="26" step="1" id="slider-title-size"
+                            oninput="updateFontSize('title',this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <label>Sinhala Name <span id="lbl-sinhala-size"></span></label>
+                        <input type="range" min="10" max="26" step="1" id="slider-sinhala-size"
+                            oninput="updateFontSize('sinhala',this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <label>Author Name <span id="lbl-author-size"></span></label>
+                        <input type="range" min="9" max="20" step="1" id="slider-author-size"
+                            oninput="updateFontSize('author',this.value)">
+                    </div>
+                    <div class="slider-row">
+                        <label>Translator Name <span id="lbl-translator-size"></span></label>
+                        <input type="range" min="9" max="20" step="1" id="slider-translator-size"
+                            oninput="updateFontSize('translator',this.value)">
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- People Manager Section -->
-            <section id="view-people" class="view-section" style="display: none;">
-                <div class="form-card" style="max-width: 100%;">
-                    <h2>People Manager</h2>
-                    <p class="subtitle">Edit an author or translator name here to update it across all their books at
-                        once. You can also add their Sinhala name.</p>
-
-                    <div class="people-tabs" style="display:flex; gap:1rem; margin: 1.5rem 0 1rem;">
-                        <button class="btn btn-primary" id="show-authors-btn"
-                            onclick="showPeopleList('author')">Authors</button>
-                        <button class="btn btn-secondary" id="show-translators-btn"
-                            onclick="showPeopleList('translator')">Translators</button>
-                    </div>
-
-                    <div id="people-search-row" style="margin-bottom:1rem;">
-                        <input type="text" id="people-search" placeholder="Search by name..." class="search-input"
-                            style="max-width:400px; padding: 0.5rem 1rem;" oninput="filterPeopleList()">
-                    </div>
-
-                    <div id="people-list-container">
-                        <p style="color: var(--text-secondary);">Click Authors or Translators above to view the list.
-                        </p>
-                    </div>
+            <!-- Administrative Tools -->
+            <div class="settings-section auth-required">
+                <div style="margin-bottom: 2rem; width: 100%;">
+                    <h3 class="settings-heading">🛠️ Management & Tools</h3>
+                    <p style="font-size:0.9rem; color:var(--text-secondary);">Administrative controls for data, library,
+                        and users.</p>
                 </div>
-            </section>
 
-            <!-- Lending Section -->
-            <section id="view-lending" class="view-section" style="display: none;">
-                <div class="form-card" style="max-width: 100%;">
-                    <h2>Lending Management</h2>
-                    <p class="subtitle">Track books lent to friends and family.</p>
-
-                    <div class="lending-container"
-                        style="display: grid; grid-template-columns: 350px 1fr; gap: 2rem; margin-top: 1.5rem;">
-                        <!-- Add Lending Form -->
-                        <div class="lending-form-sticky">
-                            <form id="add-lending-form" class="card"
-                                style="padding: 1.5rem; background: var(--bg-color); border-radius: var(--radius-lg); border: 1px solid var(--border-color);">
-                                <h3 style="margin-top:0; margin-bottom:1rem; font-size:1.1rem;">Record New Lending</h3>
-                                <div class="form-group" style="margin-bottom: 1rem;">
-                                    <label for="lendee-name">Borrower Name *</label>
-                                    <input type="text" id="lendee-name" required placeholder="Borrower's name"
-                                        class="search-input" style="width:100%;">
-                                </div>
-                                <div class="form-group" style="margin-bottom: 1rem;">
-                                    <label for="lend-date">Lend Date *</label>
-                                    <input type="date" id="lend-date" required class="search-input" style="width:100%;">
-                                </div>
-                                <div class="form-group" style="margin-bottom: 1.5rem;">
-                                    <label>Select Books *</label>
-                                    <div class="multi-select-container">
-                                        <div class="tags-input-container" id="lending-books-container"
-                                            style="min-height: 44px; padding: 4px 8px;">
-                                            <div class="tags-wrapper" id="lending-books-wrapper" style="gap: 4px;">
-                                                <input type="text" id="lending-book-search" placeholder="ID or name..."
-                                                    style="min-width: 80px; flex:1;">
-                                            </div>
-                                        </div>
-                                        <div id="lending-search-results" class="autocomplete-list"
-                                            style="display:none; position: absolute; width: calc(100% - 2px); z-index: 1000;">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="form-actions" style="display:flex; gap:0.5rem;">
-                                    <button type="submit" class="btn btn-primary" style="flex:1;">Save</button>
-                                    <button type="button" class="btn btn-secondary"
-                                        onclick="resetLendingForm()">Clear</button>
-                                </div>
-                            </form>
-                        </div>
-
-                        <!-- Lending Tables -->
-                        <div class="lending-content">
-                            <h3 style="margin-top:0;">📖 Active Lendings</h3>
-                            <div id="active-lendings-table-container">
-                                <p class="empty-state">No active records found.</p>
-                            </div>
-
-                            <details style="margin-top: 2rem;">
-                                <summary style="cursor:pointer; font-weight:600; color:var(--text-secondary);">History
-                                    (Returned)</summary>
-                                <div id="returned-lendings-table-container" style="margin-top: 1rem;">
-                                    <p class="empty-state">No history yet.</p>
-                                </div>
-                            </details>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Settings Section -->
-            <section id="view-settings" class="view-section" style="display:none;">
-                <div class="form-card" style="max-width:100%;">
-                    <h2>⚙️ Settings</h2>
-                    <p class="subtitle">Customize the appearance of your library.</p>
-
-                    <!-- Theme Picker -->
-                    <div class="settings-section">
-                        <h3 class="settings-heading">🎨 Theme</h3>
-                        <div class="theme-swatch-grid" id="theme-swatch-grid">
-                            <!-- Swatches generated by JS -->
+                <div class="management-grid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2.5rem; width: 100%;">
+                    <!-- Data Management -->
+                    <div class="mgmt-sub-section">
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1rem;">💾 Data Management
+                        </h4>
+                        <div class="action-buttons-group" style="display: flex; gap: 0.75rem;">
+                            <input type="file" id="import-csv-file" accept=".csv" style="display: none;">
+                            <button id="import-csv-btn" class="btn btn-secondary csv-btn"
+                                style="flex:1; justify-content:center;">Import</button>
+                            <button id="export-csv" class="btn btn-secondary csv-btn"
+                                style="flex:1; justify-content:center;">Export</button>
                         </div>
                     </div>
 
-                    <!-- Font Picker -->
-                    <div class="settings-section">
-                        <h3 class="settings-heading">🔤 Body Font</h3>
-                        <div class="font-card-grid" id="font-card-grid">
-                            <!-- Font cards generated by JS -->
-                        </div>
-                    </div>
-
-                    <!-- Category Colors Toggle -->
-                    <div class="settings-section">
-                        <h3 class="settings-heading">🎨 Category Color Coding</h3>
-                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1rem;">Show a colored
-                            left border on book cards based on their category.</p>
+                    <!-- Library Management -->
+                    <div class="mgmt-sub-section">
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1rem;">🗑️ Library
+                            Management</h4>
                         <label class="toggle-switch">
-                            <input type="checkbox" id="category-colors-toggle"
-                                onchange="toggleCategoryColors(this.checked)">
+                            <input type="checkbox" id="enable-delete-toggle"
+                                onchange="toggleEnableDelete(this.checked)">
                             <span class="toggle-slider"></span>
-                            <span class="toggle-label" id="cat-colors-label">Off</span>
+                            <span class="toggle-label" id="enable-delete-label">Deletion Disabled</span>
                         </label>
                     </div>
 
-                    <!-- Font Size Sliders -->
-                    <div class="settings-section">
-                        <h3 class="settings-heading">📐 Font Sizes</h3>
-                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1.25rem;">Adjust sizes to
-                            suit your reading preference.</p>
-                        <div class="font-size-sliders">
-                            <div class="slider-row">
-                                <label>Book Number <span id="lbl-id-size"></span></label>
-                                <input type="range" min="10" max="22" step="1" id="slider-id-size"
-                                    oninput="updateFontSize('id',this.value)">
-                            </div>
-                            <div class="slider-row">
-                                <label>English Name <span id="lbl-title-size"></span></label>
-                                <input type="range" min="10" max="26" step="1" id="slider-title-size"
-                                    oninput="updateFontSize('title',this.value)">
-                            </div>
-                            <div class="slider-row">
-                                <label>Sinhala Name <span id="lbl-sinhala-size"></span></label>
-                                <input type="range" min="10" max="26" step="1" id="slider-sinhala-size"
-                                    oninput="updateFontSize('sinhala',this.value)">
-                            </div>
-                            <div class="slider-row">
-                                <label>Author Name <span id="lbl-author-size"></span></label>
-                                <input type="range" min="9" max="20" step="1" id="slider-author-size"
-                                    oninput="updateFontSize('author',this.value)">
-                            </div>
-                            <div class="slider-row">
-                                <label>Translator Name <span id="lbl-translator-size"></span></label>
-                                <input type="range" min="9" max="20" step="1" id="slider-translator-size"
-                                    oninput="updateFontSize('translator',this.value)">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Data Management (Import / Export) -->
-                    <div class="settings-section auth-required">
-                        <h3 class="settings-heading">💾 Data Management</h3>
-                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1.25rem;">Backup or
-                            restore your library collection using CSV files.</p>
-
-                        <div class="action-buttons-group" style="display: flex; gap: 1rem; align-items: center;">
-                            <!-- Import CSV File Input (Hidden) -->
-                            <input type="file" id="import-csv-file" accept=".csv" style="display: none;">
-                            <button id="import-csv-btn" class="btn btn-secondary csv-btn"
-                                style="flex: 1; justify-content: center;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                    <polyline points="7 10 12 15 17 10" />
-                                    <line x1="12" y1="15" x2="12" y2="3" />
-                                </svg>
-                                Import Library
-                            </button>
-                            <button id="export-csv" class="btn btn-secondary csv-btn"
-                                style="flex: 1; justify-content: center;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                    <polyline points="17 8 12 3 7 8" />
-                                    <line x1="12" y1="3" x2="12" y2="15" />
-                                </svg>
-                                Export Library
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Enable Deletion Toggle -->
-                    <div class="settings-section auth-required">
-                        <h3 class="settings-heading">🗑️ Library Management</h3>
-                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:1.25rem;">Allow deleting
-                            books from the collection. Use with caution.</p>
-
-                        <div style="display:flex; flex-direction:column; gap:1.5rem;">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="enable-delete-toggle"
-                                    onchange="toggleEnableDelete(this.checked)">
-                                <span class="toggle-slider"></span>
-                                <span class="toggle-label" id="enable-delete-label">Deletion Disabled</span>
-                            </label>
-
-                            <div id="admin-only-tools"
-                                style="padding-top:1rem; border-top:1px solid var(--border-color);">
-                                <button id="btn-show-user-mgmt" class="btn btn-secondary"
-                                    onclick="toggleUserMgmtModal(true)"
-                                    style="display:none; align-items:center; gap:0.5rem;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2">
-                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                        <circle cx="9" cy="7" r="4"></circle>
-                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                    </svg>
-                                    User Management
-                                </button>
-                            </div>
-                        </div>
+                    <!-- User Management -->
+                    <div class="mgmt-sub-section" id="admin-only-tools">
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1rem;">👤 User Management
+                        </h4>
+                        <button id="btn-show-user-mgmt" class="btn btn-secondary" onclick="toggleUserMgmtModal(true)"
+                            style="display:none; align-items:center; gap:0.5rem; width:100%; justify-content:center;">
+                            Manage Users
+                        </button>
                     </div>
                 </div>
-            </section>
-        </main>
+            </div>
+        </div>
+    </section>
+    </main>
     </div>
 
     <!-- Notification Toast -->

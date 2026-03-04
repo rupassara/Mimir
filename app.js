@@ -28,6 +28,7 @@ let currentTags = [];
 let isEditing = false;
 let currentUser = null;
 let PAGE_SIZE = 24;
+let viewMode = 'both'; // both, eng, sin
 let lendings = [];
 let lendingSelectedBooks = []; // Temporary storage for lending form
 
@@ -39,7 +40,13 @@ async function initData() {
         if (!querySnapshot.empty) {
             books = [];
             querySnapshot.forEach((doc) => {
-                books.push(doc.data());
+                const data = doc.data();
+                // Crucial: document ID must be used as the internal 'id' if 'id' field is missing or inconsistent
+                if (!data.id) data.id = doc.id;
+                // Ensure ID is treated consistently (some might be strings, others ints)
+                // However, the app uses parseInt(id, 10) in some places. 
+                // Let's keep the existing format but ensure it exists.
+                books.push(data);
             });
         } else {
             // Fetch initial data if database is empty
@@ -62,7 +69,7 @@ async function initData() {
     }
 
     // Filter out potential nulls
-    books = books.filter(b => b !== null && b !== undefined);
+    books = (books || []).filter(b => b !== null && b !== undefined);
 
     // Reverse to show newest first by default
     filteredBooks = [...books].reverse();
@@ -109,13 +116,20 @@ async function markReturned(lendId) {
 
         await setDoc(doc(db, "lendings", lendId), lending);
         showToast("Book(s) marked as returned.");
+
+        // Refresh everything
         renderLendingPage();
+        renderStats();
         renderBooks();
     } catch (error) {
         console.error("Error updating lending:", error);
-        showToast("Error updating record.");
+        showToast("Error updating record. " + error.message);
     }
 }
+window.markReturned = async function (lendId) {
+    if (!currentUser) return showToast("Login required to mark as returned.");
+    await markReturned(lendId);
+};
 
 async function saveData() {
     const cleanBooks = books.filter(b => b !== null && b !== undefined);
@@ -192,7 +206,31 @@ function getMimirEmail(username) {
 async function signIn(username, password) {
     try {
         const email = getMimirEmail(username);
-        await signInWithEmailAndPassword(auth, email, password);
+
+        // On-demand seeding for admin if it doesn't exist
+        if (username === 'admin' && password === 'admin123') {
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (err) {
+                if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+                    console.log("Seeding admin account on-demand...");
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    await setDoc(doc(db, "users", userCredential.user.uid), {
+                        username: 'admin',
+                        role: 'admin',
+                        createdAt: new Date().toISOString()
+                    });
+                    console.log("Admin account seeded successfully.");
+                    // Sign in again after creation
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    throw err;
+                }
+            }
+        } else {
+            await signInWithEmailAndPassword(auth, email, password);
+        }
+
         showToast("Logged in successfully!");
         return true;
     } catch (error) {
@@ -208,55 +246,7 @@ async function signIn(username, password) {
     }
 }
 
-async function initAdminAccount() {
-    if (window._mimirAdminCheckDone) return;
-    window._mimirAdminCheckDone = true;
-
-    try {
-        const adminEmail = getMimirEmail('admin');
-        const adminPassword = 'admin123';
-
-        try {
-            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-            console.log("Admin account verified.");
-            // Ensure Firestore entry exists even if Auth does
-            const querySnapshot = await getDocs(collection(db, "users"));
-            const userData = querySnapshot.docs.find(d => d.id === auth.currentUser.uid)?.data();
-            if (!userData) {
-                await setDoc(doc(db, "users", auth.currentUser.uid), {
-                    username: 'admin',
-                    role: 'admin',
-                    createdAt: new Date().toISOString()
-                });
-            }
-        } catch (error) {
-            console.warn("Seeding check result:", error.code);
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
-                console.log("Seeding admin account...");
-                try {
-                    await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
-                    await setDoc(doc(db, "users", auth.currentUser.uid), {
-                        username: 'admin',
-                        role: 'admin',
-                        createdAt: new Date().toISOString()
-                    });
-                    console.log("Admin account seeded successfully.");
-                    showToast("System Initialized: Use admin / admin123");
-                    await signOut(auth);
-                } catch (seedErr) {
-                    console.error("Critical seeding failure:", seedErr);
-                    if (seedErr.code === 'auth/email-already-in-use') {
-                        console.log("Admin email exists but initialization failed. Please check Firebase Console.");
-                    } else {
-                        showToast("Setup failed: " + seedErr.code);
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error("Admin initialization error:", error);
-    }
-}
+// DEPRECATED: initAdminAccount functionality moved into signIn for security
 
 async function logout() {
     try {
@@ -271,7 +261,6 @@ async function logout() {
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     await initData();
-    await initAdminAccount();
     populateFilterDropdowns();
     renderBooks();
 
@@ -305,6 +294,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     userDisplayName.textContent = (user.email || 'User').split('@')[0];
                 }
+
+                // CRITICAL: Sync lendings from cloud when auth state changes
+                await initLendings();
+                if (document.getElementById('view-lending').style.display !== 'none') {
+                    renderLendingPage();
+                }
             } catch (e) {
                 userDisplayName.textContent = (user.email || 'User').split('@')[0];
             }
@@ -337,6 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     renderBooks();
                 } else if (s.id === 'view-stats') {
                     renderStats();
+                    renderTagsDirectory();
                 } else if (s.id === 'view-settings') {
                     // Show/Hide User Management button for Admin ONLY
                     const userMgmtBtn = document.getElementById('btn-show-user-mgmt');
@@ -344,6 +340,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const isAdmin = document.body.classList.contains('is-admin');
                         userMgmtBtn.style.display = isAdmin ? 'inline-flex' : 'none';
                     }
+                } else if (s.id === 'view-add-edit') {
+                    // Ensure form is reset when navigating to add/edit tab
+                    resetForm();
+                } else if (s.id === 'view-people') {
+                    renderPeopleList();
+                } else if (s.id === 'view-lending') {
+                    renderLendingPage();
                 }
             });
         });
@@ -412,7 +415,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             name: document.getElementById('book-name').value.trim(),
             sinhalaName: document.getElementById('book-sinhala-name').value.trim(),
             author: document.getElementById('book-author').value.trim(),
+            authorSinhala: document.getElementById('book-author-sinhala').value.trim(),
             translator: document.getElementById('book-translator').value.trim(),
+            translatorSinhala: document.getElementById('book-translator-sinhala').value.trim(),
             language: document.getElementById('book-language').value,
             category: document.getElementById('book-category').value,
             tags: [...currentTags]
@@ -445,6 +450,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupAutocomplete('book-tags-input', 'tags', 'autocomplete-tags', (val) => {
         addTag(val);
         tagsInput.value = '';
+    });
+
+    // Language Toggle logic
+    const langBtns = document.querySelectorAll('.lang-btn');
+    langBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            langBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            viewMode = btn.dataset.lang;
+            renderPage(); // Refresh current view with new mode
+        });
     });
 
     // Tags Input Logic
@@ -489,6 +505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 resetLendingForm();
                 renderLendingPage();
                 renderBooks();
+                renderLendingSummaryStats();
             }
         });
     }
@@ -498,8 +515,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         lendingSearchInput.addEventListener('input', (e) => updateLendingAutocomplete(e.target.value));
     }
 
-    // Initialize Theme and View settings now that listeners are attached
+    // Initialize Settings UI and Themes
+    initSettings();
     initTheme();
+    renderSettingsPage();
 });
 
 // ==========================================
@@ -509,7 +528,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initTheme() {
     const savedTheme = localStorage.getItem('aurora_theme') || 'light';
     setTheme(savedTheme);
-    themeSelector.value = savedTheme;
 
     const savedView = localStorage.getItem('aurora_view') || 'list';
     if (savedView === 'grid') {
@@ -626,35 +644,72 @@ function renderPage() {
         const tagsHtml = (book.tags || []).length > 0 ?
             `<div class="book-tags">${book.tags.map(t => `<span class="book-tag-chip clickable" onclick="filterByTag('${t.replace(/'/g, "\\'")}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>${escapeHTML(t)}</span>`).join('')}</div>`
             : '';
-        const sinhalaTitleHtml = book.sinhalaName ? `<div class="book-sinhala-title">${escapeHTML(book.sinhalaName)}</div>` : '';
+
+        const isSin = viewMode === 'sin';
+        const isEng = viewMode === 'eng';
+
+        // Title Rendering
+        let titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>`;
+        if (isSin && book.sinhalaName) {
+            titleDisplay = `<div class="book-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
+        } else if (!isEng && book.sinhalaName) {
+            titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>
+                            <div class="book-sinhala-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
+        }
+
+        // Author Rendering
+        let authorDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.author.replace(/'/g, "\\'")}')">${escapeHTML(book.author)}</div>`;
+        if (isSin && book.authorSinhala) {
+            authorDisplay = `<div class="clickable-name" lang="si" onclick="searchByCreator('${book.author.replace(/'/g, "\\'")}')">${escapeHTML(book.authorSinhala)}</div>`;
+        } else if (!isEng && book.authorSinhala) {
+            authorDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.author.replace(/'/g, "\\'")}')">${escapeHTML(book.author)}</div>
+                             <div class="sinhala-meta" lang="si">(${escapeHTML(book.authorSinhala)})</div>`;
+        }
+
+        // Translator Rendering
+        let translatorHtml = '';
+        if (book.translator || book.translatorSinhala) {
+            let transDisplay = '';
+            if (isSin && book.translatorSinhala) {
+                transDisplay = `<div class="clickable-name" lang="si" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translatorSinhala)}</div>`;
+            } else if (!isEng && book.translatorSinhala) {
+                transDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translator)}</div>
+                                 <div class="sinhala-meta" lang="si">(${escapeHTML(book.translatorSinhala)})</div>`;
+            } else {
+                transDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translator)}</div>`;
+            }
+            translatorHtml = `<div class="book-translator-row"><div class="meta-item"><div class="translator-label">Translated by</div> ${transDisplay}</div></div>`;
+        } else {
+            translatorHtml = '<div class="book-translator-row book-translator-empty"></div>';
+        }
 
         const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => lb.id === book.id));
-        const lentBadge = isLent ? `<span class="lent-badge">📚 Lent</span>` : '';
+        const lentBadge = isLent ? `<span class="lent-symbol" title="Currently Lent Out">🔒</span>` : '';
 
         return `
-        <div class="book-card" data-category="${escapeHTML(book.category)}">
-            <div class="book-id">
-                ${String(book.id).padStart(4, '0')}
-                ${lentBadge}
-            </div>
-            <div class="book-main">
-                <h3 class="book-title">${escapeHTML(book.name)}</h3>
-                ${sinhalaTitleHtml}
-            </div>
-            <div class="book-author" onclick="searchByCreator('${book.author.replace(/'/g, "\\'")}')">${escapeHTML(book.author)}</div>
-            ${book.translator ? `<div class="book-translator-row"><span class="meta-item"><span class="translator-label">Translated by</span> <span class="clickable-name" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translator)}</span></span></div>` : '<div class="book-translator-row book-translator-empty"></div>'}
-            <div class="book-meta">
-                <div class="meta-item" style="gap: 0.75rem;">
-                    <span class="tag clickable" onclick="filterByCategory('${book.category.replace(/'/g, "\\'")}')">${escapeHTML(book.category)}</span>
-                    <span class="tag" style="background: transparent; border: 1px solid var(--border-color);">${escapeHTML(book.language)}</span>
+            <div class="book-card" data-id="${book.id}" data-category="${escapeHTML(book.category)}">
+                <div class="book-id">
+                    ${String(book.id).padStart(4, '0')}
+                    ${lentBadge}
                 </div>
+                <div class="book-main">
+                    ${titleDisplay}
+                </div>
+                <div class="book-author">${authorDisplay}</div>
+                ${translatorHtml}
+                <div class="book-meta">
+                    <div class="meta-item" style="gap: 0.75rem;">
+                        <span class="tag clickable" onclick="filterByCategory('${book.category.replace(/'/g, "\\'")}')">${escapeHTML(book.category)}</span>
+                        <span class="tag" style="background: transparent; border: 1px solid var(--border-color);">${escapeHTML(book.language)}</span>
+                    </div>
+                </div>
+                ${isEng ? '' : tagsHtml}
+                <button class="edit-book-btn" data-id="${book.id}" title="Edit Book">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
             </div>
-            ${tagsHtml}
-            <button class="edit-book-btn" data-id="${book.id}" aria-label="Edit book">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            </button>
-        </div>
-    `}).join('');
+        `;
+    }).join('');
 
     bookStats.textContent = `Showing ${startIndex + 1}-${endIndex} of ${totalItems} books`;
     updatePaginationInfo(totalItems);
@@ -816,7 +871,9 @@ function startEditMode(id) {
     document.getElementById('book-name').value = book.name || '';
     document.getElementById('book-sinhala-name').value = book.sinhalaName || '';
     document.getElementById('book-author').value = book.author || '';
+    document.getElementById('book-author-sinhala').value = book.authorSinhala || '';
     document.getElementById('book-translator').value = book.translator || '';
+    document.getElementById('book-translator-sinhala').value = book.translatorSinhala || '';
     document.getElementById('book-language').value = book.language || '';
     document.getElementById('book-category').value = book.category || '';
 
@@ -908,14 +965,13 @@ function exportToCsv() {
 
     const headers = ["ID", "Name", "Sinhala Name", "Author", "Translator", "Language", "Category", "Tags"];
 
-    const rows = filteredBooks.map(book => {
-        // Wrapper for handling commas within data
-        const escapeCsv = (val) => {
-            if (!val) return '""';
-            const str = String(val).replace(/"/g, '""');
-            return `"${str}"`;
-        };
+    const escapeCsv = (val) => {
+        if (!val) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+    };
 
+    const rows = filteredBooks.map(book => {
         return [
             book.id,
             escapeCsv(book.name),
@@ -928,7 +984,29 @@ function exportToCsv() {
         ].join(',');
     });
 
-    const csvContent = [headers.join(','), ...rows].join('\n');
+    // Lending records export
+    const lendRows = lendings.map(l => {
+        const escapeCsv = (val) => {
+            if (!val) return '""';
+            const str = String(val).replace(/"/g, '""');
+            return `"${str}"`;
+        };
+        return [
+            "LOAN",
+            escapeCsv(l.borrower),
+            l.lendDate,
+            l.status,
+            l.returnDate || '',
+            escapeCsv(l.books.map(b => b.id).join(';'))
+        ].join(',');
+    });
+
+    const csvContent = [
+        headers.join(','),
+        ...rows,
+        ["TYPE", "Borrower/Lendee", "Date", "Status", "Returned", "BookIDs (separated by ;) "].join(','),
+        ...lendRows
+    ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
 
@@ -1156,6 +1234,35 @@ function renderStats() {
     renderLendingSummaryStats();
 }
 
+function renderTagsDirectory() {
+    const container = document.getElementById('tags-directory-container');
+    if (!container) return;
+
+    const tagCounts = {};
+    books.forEach(b => {
+        (b.tags || []).forEach(t => {
+            tagCounts[t] = (tagCounts[t] || 0) + 1;
+        });
+    });
+
+    const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+
+    if (sortedTags.length === 0) {
+        container.innerHTML = '<p class="empty-state">No tags found.</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="tags-directory-list" style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+            ${sortedTags.map(([tag, count]) => `
+                <span class="book-tag-chip clickable" onclick="filterByTag('${tag.replace(/'/g, "\\'")}')" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                    ${escapeHTML(tag)} <span style="opacity: 0.6; margin-left: 0.4rem; font-size: 0.7rem;">${count}</span>
+                </span>
+            `).join('')}
+        </div>
+    `;
+}
+
 // ==========================================
 // People Manager
 // ==========================================
@@ -1225,14 +1332,17 @@ function renderPeopleList() {
                 <tr id="person-row-${i}">
                     <td><input type="checkbox" class="person-cb" data-name="${escapeHTML(p.name)}" onchange="updateMergeToolbar()" /></td>
                     <td>
-                        <input class="people-name-input" id="person-name-${i}" value="${escapeHTML(p.name)}" type="text" />
+                        <input class="people-name-input" id="person-name-${i}" value="${escapeHTML(p.name)}" type="text" placeholder="English Name" />
                     </td>
                     <td>
-                        <input class="people-sinhala-input" id="person-sinhala-${i}" value="${escapeHTML(p.sinhalaName)}" type="text" lang="si" placeholder="සිංහල නම" />
+                        <input class="people-name-input" id="person-sinhala-name-${i}" value="${escapeHTML(p.sinhalaName)}" type="text" lang="si" placeholder="සිංහල නම" />
                     </td>
-                    <td><span class="tag">${p.count}</span></td>
+                    <td style="text-align:center;"><strong>${p.count}</strong></td>
                     <td>
-                        <button class="btn btn-primary" style="padding:0.3rem 0.8rem; font-size:0.8rem;" onclick="savePerson(${i}, '${p.name.replace(/'/g, "\\'")}')">Save</button>
+                        <div style="display:flex; gap:0.4rem;">
+                            <button class="btn btn-primary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="savePersonRow(${i}, '${p.name.replace(/'/g, "\\'")}')">Save</button>
+                            <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="showMergePanel(${i})">Merge</button>
+                        </div>
                     </td>
                 </tr>`).join('')}
             </tbody>
@@ -1240,35 +1350,34 @@ function renderPeopleList() {
     `;
 }
 
-window.savePerson = async function (index, originalName) {
+window.savePersonRow = async function (index, originalName) {
+    // Find Sinhala name field key
+    const sinhalaKey = `${currentPeopleField}SinhalaName`;
     const newName = document.getElementById(`person-name-${index}`).value.trim();
-    const sinhalaName = document.getElementById(`person-sinhala-${index}`).value.trim();
+    const newSinhalaName = document.getElementById(`person-sinhala-name-${index}`).value.trim();
 
     if (!newName) {
-        showToast('Name cannot be empty.');
+        showToast("English name cannot be empty.");
         return;
     }
 
-    const sinhalaKey = `${currentPeopleField}SinhalaName`;
     let updated = 0;
-
     books.forEach(book => {
         if ((book[currentPeopleField] || '').trim() === originalName) {
             book[currentPeopleField] = newName;
-            book[sinhalaKey] = sinhalaName;
+            book[sinhalaKey] = newSinhalaName;
             updated++;
         }
     });
 
-    if (updated === 0) {
-        showToast('No books found for that person.');
-        return;
+    if (updated > 0) {
+        await saveData();
+        showToast(`✅ Updated ${updated} book(s) to "${newName}".`);
+        renderPeopleList();
+        renderBooks(); // Assuming renderBooks() is the correct function to refresh the main book list
+    } else {
+        showToast('No books found for that person to update.');
     }
-
-    await saveData();
-    showToast(`Updated ${updated} book(s) for "${newName}".`);
-    renderPeopleList();
-    applyFilters();
 };
 
 // ==========================================
@@ -1440,25 +1549,34 @@ function renderLeaderboard(containerId, field, topN = 15) {
 // Settings Manager
 // ==========================================
 const THEMES = [
-    { id: 'light', name: '☀️ Light', bg: '#fcfaf8', surface: '#ffffff', accent: '#8a5a44' },
-    { id: 'dark', name: '🌙 Dark', bg: '#1a1817', surface: '#242120', accent: '#c28b72' },
-    { id: 'sepia', name: '📜 Sepia', bg: '#f4ecd8', surface: '#e9dec1', accent: '#a65d3b' },
-    { id: 'nord', name: '❄️ Nord', bg: '#2e3440', surface: '#3b4252', accent: '#88c0d0' },
-    { id: 'forest', name: '🌿 Forest', bg: '#1b2b1f', surface: '#243328', accent: '#56a85f' },
-    { id: 'ocean', name: '🌊 Ocean', bg: '#0d1b2a', surface: '#152233', accent: '#4d9de0' },
-    { id: 'crimson', name: '🔴 Crimson', bg: '#1c0f12', surface: '#2b1519', accent: '#c0384a' },
+    { id: 'light', name: '☀️ Aurora Light', bg: '#fcfaf8', surface: '#ffffff', accent: '#8a5a44' },
+    { id: 'dark', name: '🌙 Midnight Dark', bg: '#1a1817', surface: '#242120', accent: '#c28b72' },
+    { id: 'sepia', name: '📜 Antique Sepia', bg: '#f4ecd8', surface: '#e9dec1', accent: '#a65d3b' },
+    { id: 'nord', name: '❄️ Nordic Frost', bg: '#2e3440', surface: '#3b4252', accent: '#88c0d0' },
+    { id: 'forest', name: '🌿 Emerald Forest', bg: '#1b2b1f', surface: '#243328', accent: '#56a85f' },
+    { id: 'ocean', name: '🌊 Deep Ocean', bg: '#0d1b2a', surface: '#152233', accent: '#4d9de0' },
+    { id: 'crimson', name: '🔴 Velvet Crimson', bg: '#1c0f12', surface: '#2b1519', accent: '#c0384a' },
     { id: 'purple', name: '🟣 Purple Night', bg: '#130d1f', surface: '#1e1430', accent: '#9d62d9' },
-    { id: 'contrast', name: '👁️ High Contrast', bg: '#f8f8f8', surface: '#ffffff', accent: '#0056d6' },
-    { id: 'rosegold', name: '🌸 Rose Gold', bg: '#fff5f7', surface: '#ffffff', accent: '#c96b7e' },
-    { id: 'solarized', name: '🌅 Solarized Dark', bg: '#002b36', surface: '#073642', accent: '#268bd2' },
+    { id: 'rosegold', name: '🌸 Sakura Blossom', bg: '#fff5f7', surface: '#ffffff', accent: '#c96b7e' },
+    { id: 'cyber', name: '🎮 Cyberpunk', bg: '#000000', surface: '#121212', accent: '#f72585' },
+    { id: 'oasis', name: '🏝️ Desert Oasis', bg: '#e9edc9', surface: '#fefae0', accent: '#2a9d8f' },
+    { id: 'solarized', name: '🌅 Solarized', bg: '#002b36', surface: '#073642', accent: '#268bd2' },
     { id: 'dracula', name: '🧛 Dracula', bg: '#282a36', surface: '#363948', accent: '#ff79c6' },
     { id: 'tokyo', name: '🗼 Tokyo Night', bg: '#1a1b2e', surface: '#24253d', accent: '#7aa2f7' },
-    { id: 'catppuccin', name: '🍵 Catppuccin', bg: '#1e1e2e', surface: '#292938', accent: '#cba6f7' },
-    { id: 'mint', name: '🍃 Mint', bg: '#f0faf4', surface: '#ffffff', accent: '#2e8b5a' },
+    { id: 'lavender', name: '🪻 Lavender Mist', bg: '#f8f8ff', surface: '#ffffff', accent: '#9370db' },
+    { id: 'copper', name: '🧱 Copper Slate', bg: '#1c1c1c', surface: '#262626', accent: '#b87333' },
+    { id: 'teal-dark', name: '🐋 Deep Teal', bg: '#001219', surface: '#002129', accent: '#94d2bd' },
+    { id: 'ruby', name: '🍷 Royal Ruby', bg: '#1a0500', surface: '#2a0800', accent: '#d00000' },
+    { id: 'slate-blue', name: '🏔️ Slate Blue', bg: '#1e293b', surface: '#334155', accent: '#38bdf8' },
+    { id: 'gold-knight', name: '🏆 Golden Knight', bg: '#1a1817', surface: '#242120', accent: '#d4af37' },
+    { id: 'mint-fresh', name: '🍃 Mint Fresh', bg: '#f0fff4', surface: '#ffffff', accent: '#3eb489' },
+    { id: 'coffee-break', name: '☕ Coffee Break', bg: '#302b27', surface: '#3d3632', accent: '#a67c52' },
+    { id: 'void', name: '🌌 Eternal Void', bg: '#050505', surface: '#111111', accent: '#6366f1' },
+    { id: 'neon', name: '⚡ Neon Cyber', bg: '#0d0221', surface: '#1a0633', accent: '#00ff41' },
 ];
 
 const FONTS = [
-    { family: 'Inter', name: 'Inter', preview: 'Aa' },
+    // DEPRECATED: themes array merged into THEMES constant at line ~1500
     { family: 'Roboto', name: 'Roboto', preview: 'Aa' },
     { family: 'Lato', name: 'Lato', preview: 'Aa' },
     { family: 'Open Sans', name: 'Open Sans', preview: 'Aa' },
@@ -1557,8 +1675,17 @@ function loadGoogleFont(family) {
     document.head.appendChild(link);
 }
 
+function initSettings() {
+    const saved = localStorage.getItem('aurora_settings');
+    if (saved) {
+        currentSettings = JSON.parse(saved);
+    }
+    // Sync with individual storage items to be robust
+    const theme = localStorage.getItem('aurora_theme');
+    if (theme) currentSettings.theme = theme;
+}
+
 function renderSettingsPage() {
-    // Theme swatches
     const swatchGrid = document.getElementById('theme-swatch-grid');
     if (swatchGrid) {
         swatchGrid.innerHTML = THEMES.map(t => `
@@ -1585,38 +1712,29 @@ function renderSettingsPage() {
         }).join('');
     }
 
-    // Category colors toggle
-    const toggle = document.getElementById('category-colors-toggle');
+    // Settings listeners (Search, Deletion, etc.)
+    const toggle = document.getElementById('enable-delete-toggle');
     if (toggle) {
-        toggle.checked = currentSettings.categoryColors;
-        document.getElementById('cat-colors-label').textContent = currentSettings.categoryColors ? 'On' : 'Off';
+        toggle.checked = currentSettings.enableDelete;
+        document.getElementById('enable-delete-label').textContent = currentSettings.enableDelete ? "Enabled" : "Disabled";
     }
 
-    // Font size sliders
-    const SLIDER_MAP = [
-        { key: 'idSize', sliderId: 'slider-id-size', labelId: 'lbl-id-size', prop: '--user-id-size' },
-        { key: 'titleSize', sliderId: 'slider-title-size', labelId: 'lbl-title-size', prop: '--user-title-size' },
-        { key: 'sinhalaSize', sliderId: 'slider-sinhala-size', labelId: 'lbl-sinhala-size', prop: '--user-sinhala-size' },
-        { key: 'authorSize', sliderId: 'slider-author-size', labelId: 'lbl-author-size', prop: '--user-author-size' },
-        { key: 'translatorSize', sliderId: 'slider-translator-size', labelId: 'lbl-translator-size', prop: '--user-translator-size' },
-    ];
-    SLIDER_MAP.forEach(({ key, sliderId, labelId }) => {
-        const slider = document.getElementById(sliderId);
-        const label = document.getElementById(labelId);
-        if (!slider || !label) return;
+    // Sync sliders for font sizes
+    const types = ['id', 'title', 'sinhala', 'author', 'translator'];
+    types.forEach(type => {
+        const key = FONT_SIZE_KEY_MAP[type];
         const val = currentSettings[key] || DEFAULT_FONT_SIZES[key];
-        slider.value = val;
-        label.textContent = `${val}px`;
+        const slider = document.getElementById(`slider-${type}-size`);
+        const label = document.getElementById(`lbl-${type}-size`);
+        if (slider) slider.value = val;
+        if (label) label.textContent = `${val}px`;
     });
 }
 
-function initSettings() {
-    loadSettings();
-    applySettings();
-    document.querySelectorAll('.tab-btn[data-target="view-settings"]').forEach(btn => {
-        btn.addEventListener('click', () => renderSettingsPage());
-    });
-}
+// Settings Event Listeners
+document.querySelectorAll('.tab-btn[data-target="view-settings"]').forEach(btn => {
+    btn.addEventListener('click', () => renderSettingsPage());
+});
 
 // Call settings init on startup
 initSettings();
@@ -1717,18 +1835,24 @@ window.resetLendingForm = function () {
     renderLendingBooks();
 }
 
-function updateLendingAutocomplete(query) {
+window.updateLendingAutocomplete = function (query) {
     const resultsContainer = document.getElementById('lending-search-results');
-    if (!query.trim()) {
+    if (!query || !query.trim()) {
         resultsContainer.style.display = 'none';
         return;
     }
 
+    const q = query.toLowerCase().trim();
     const matched = books.filter(b => {
-        const idMatch = String(b.id).includes(query);
-        const nameMatch = (b.name || '').toLowerCase().includes(query.toLowerCase());
-        const isAlreadySelected = lendingSelectedBooks.some(s => s.id === b.id);
-        const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => lb.id === b.id));
+        const idStr = String(b.id || '').toLowerCase();
+        const nameStr = (b.name || '').toLowerCase();
+
+        const idMatch = idStr.includes(q);
+        const nameMatch = nameStr.includes(q);
+
+        const isAlreadySelected = lendingSelectedBooks.some(s => String(s.id) === String(b.id));
+        const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => String(lb.id) === String(b.id)));
+
         return (idMatch || nameMatch) && !isAlreadySelected && !isLent;
     }).slice(0, 10);
 
@@ -1738,15 +1862,15 @@ function updateLendingAutocomplete(query) {
     }
 
     resultsContainer.innerHTML = matched.map(b => `
-        <div class="autocomplete-item" onclick="addLendingBook(${b.id})">
+        <li onclick="addLendingBook('${b.id}')">
             <strong>#${b.id}</strong> - ${escapeHTML(b.name)}
-        </div>
+        </li>
     `).join('');
     resultsContainer.style.display = 'block';
 }
 
 window.addLendingBook = function (id) {
-    const book = books.find(b => b.id === id);
+    const book = books.find(b => String(b.id) === String(id));
     if (book) {
         lendingSelectedBooks.push(book);
         renderLendingBooks();
