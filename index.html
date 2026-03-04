@@ -449,13 +449,14 @@
                         <p class="empty-state">No active records found.</p>
                     </div>
 
-                    <details style="margin-top: 2rem;">
-                        <summary style="cursor:pointer; font-weight:600; color:var(--text-secondary);">History
-                            (Returned)</summary>
-                        <div id="returned-lendings-table-container" style="margin-top: 1rem;">
-                            <p class="empty-state">No history yet.</p>
-                        </div>
-                    </details>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 2rem;">
+                        <h3 style="margin:0;">🕒 Recently Returned</h3>
+                        <button class="btn btn-secondary btn-sm auth-required" onclick="clearLendingHistory()">Clear
+                            History</button>
+                    </div>
+                    <div id="returned-lendings-table-container" style="margin-top: 1rem;">
+                        <p class="empty-state">No history yet.</p>
+                    </div>
                 </div>
             </div>
         </div>
