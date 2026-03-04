@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getFirestore, collection, getDocs, doc, writeBatch, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyB_-91cPMJeAI5z_ntghG-nl5v1IWJ2qT8",
@@ -17,6 +17,10 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = null;
+
+// Secondary app to prevent admin logout when creating users
+const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+const secondaryAuth = getAuth(secondaryApp);
 
 // ==========================================
 // State Management
@@ -1376,16 +1380,28 @@ function renderPeopleList() {
 
     container.innerHTML = `
         <!-- Merge toolbar — shown when checkboxes are selected -->
-        <div id="merge-toolbar" style="display:none; background:var(--accent-light); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.75rem 1rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem; align-items:center;">
-            <span id="merge-selection-label" style="font-size:0.85rem; color:var(--text-secondary); flex:none;">0 selected</span>
-            <input type="text" id="merge-correct-name" placeholder="Type the CORRECT name to use for all selected…"
-                style="flex:1; min-width:260px; padding:0.4rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--surface-color); color:var(--text-primary); font-size:0.9rem;" />
-            <button class="btn btn-primary" style="background:#e05252; padding:0.4rem 1rem; font-size:0.85rem;" onclick="confirmCheckboxMerge()">✓ Merge Selected</button>
-            <button class="btn btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.85rem;" onclick="clearPeopleSelection()">✕ Clear</button>
+        <div id="merge-toolbar" style="display:none; background:var(--accent-light); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.75rem 1rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+            <div style="flex:none; align-self:center;">
+                <span id="merge-selection-label" style="font-size:0.85rem; color:var(--text-secondary);">0 selected</span>
+            </div>
+            <div style="flex:1; min-width:200px; display:flex; flex-direction:column; gap:0.25rem;">
+                <label style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">Merged English Name</label>
+                <input type="text" id="merge-correct-name" placeholder="Type the CORRECT name..."
+                    style="padding:0.4rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--surface-color); color:var(--text-primary); font-size:0.9rem;" />
+            </div>
+            <div style="flex:1; min-width:200px; display:flex; flex-direction:column; gap:0.25rem;">
+                <label style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">Merged Sinhala Name</label>
+                <input type="text" id="merge-correct-sinhala" placeholder="Type the CORRECT Sinhala name..." lang="si"
+                    style="padding:0.4rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--surface-color); color:var(--text-primary); font-size:0.9rem;" />
+            </div>
+            <div style="display:flex; gap:0.5rem; align-self:flex-end;">
+                <button class="btn btn-primary" style="background:#e05252; padding:0.4rem 1rem; font-size:0.85rem;" onclick="confirmCheckboxMerge()">✓ Merge Selected</button>
+                <button class="btn btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.85rem;" onclick="clearPeopleSelection()">✕ Clear</button>
+            </div>
         </div>
 
         <div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
-            ☑ Check rows to select duplicates, then type the correct name and click <strong>Merge Selected</strong>.
+            ☑ Check rows to select duplicates, then type the correct names and click <strong>Merge Selected</strong>.
         </div>
 
         <table class="people-table">
@@ -1410,10 +1426,7 @@ function renderPeopleList() {
                     </td>
                     <td style="text-align:center;"><strong>${p.count}</strong></td>
                     <td>
-                        <div style="display:flex; gap:0.4rem;">
-                            <button class="btn btn-primary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="savePersonRow(${i}, '${p.name.replace(/'/g, "\\'")}')">Save</button>
-                            <button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="showMergePanel(${i})">Merge</button>
-                        </div>
+                        <button class="btn btn-primary" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onclick="savePersonRow(${i}, '${p.name.replace(/'/g, "\\'")}')">Save</button>
                     </td>
                 </tr>`).join('')}
             </tbody>
@@ -1555,8 +1568,10 @@ window.clearPeopleSelection = function () {
 
 window.confirmCheckboxMerge = async function () {
     const correctName = (document.getElementById('merge-correct-name').value || '').trim();
+    const correctSinhala = (document.getElementById('merge-correct-sinhala').value || '').trim();
+
     if (!correctName) {
-        showToast('Please type the correct name to merge into.');
+        showToast('Please type the correct English name to merge into.');
         return;
     }
 
@@ -1572,6 +1587,7 @@ window.confirmCheckboxMerge = async function () {
     books.forEach(book => {
         if (selectedNames.includes((book[currentPeopleField] || '').trim())) {
             book[currentPeopleField] = correctName;
+            book[sinhalaKey] = correctSinhala;
             totalMerged++;
         }
     });
@@ -1791,7 +1807,7 @@ function renderSettingsPage() {
     }
 
     // Sync sliders for font sizes
-    const types = ['id', 'title', 'sinhala', 'author', 'translator'];
+    const types = ['id', 'title', 'sinhala', 'author', 'authorSin', 'translator', 'translatorSin'];
     types.forEach(type => {
         const key = FONT_SIZE_KEY_MAP[type];
         const val = currentSettings[key] || DEFAULT_FONT_SIZES[key];
@@ -1818,7 +1834,9 @@ const DEFAULT_FONT_SIZES = {
     titleSize: 18,
     sinhalaSize: 17,
     authorSize: 14,
+    authorSinSize: 14,
     translatorSize: 13,
+    translatorSinSize: 13,
 };
 
 const FONT_SIZE_PROPS = {
@@ -1826,7 +1844,9 @@ const FONT_SIZE_PROPS = {
     titleSize: '--user-title-size',
     sinhalaSize: '--user-sinhala-size',
     authorSize: '--user-author-size',
+    authorSinSize: '--user-author-sin-size',
     translatorSize: '--user-translator-size',
+    translatorSinSize: '--user-translator-sin-size',
 };
 
 const FONT_SIZE_KEY_MAP = {
@@ -1834,7 +1854,9 @@ const FONT_SIZE_KEY_MAP = {
     title: 'titleSize',
     sinhala: 'sinhalaSize',
     author: 'authorSize',
+    authorSin: 'authorSinSize',
     translator: 'translatorSize',
+    translatorSin: 'translatorSinSize',
 };
 
 window.updateFontSize = function (type, pxVal) {
@@ -2178,10 +2200,16 @@ async function refreshUserList() {
 }
 
 window.promptResetPassword = async function (uid, username) {
-    const newPass = prompt(`Enter new password for ${username}:`);
-    if (!newPass || newPass.length < 6) return showToast("Password too short.");
+    if (!confirm(`Are you sure you want to send a password reset email to ${username}?`)) return;
 
-    showToast("Password reset requires administrative override. (Simulated in static mode)");
+    try {
+        const email = getMimirEmail(username);
+        await sendPasswordResetEmail(auth, email);
+        showToast(`Password reset email sent to ${email}. Note: If this is a @mimir.local address, the user cannot receive it.`);
+    } catch (e) {
+        console.error("Failed to send reset email:", e);
+        showToast("Error sending reset email: " + e.message);
+    }
 }
 
 window.handleCreateUser = async function (e) {
@@ -2193,12 +2221,135 @@ window.handleCreateUser = async function (e) {
     if (!user || pass.length < 6) return showToast("Invalid username or short password.");
 
     try {
-        showToast("Processing request...");
+        showToast("Creating user...");
         const email = getMimirEmail(user);
-        // User creation logic...
-        showToast("User creation successful (Simulated for GitHub Pages).");
+
+        // Use secondaryAuth so the admin does not get logged out
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
+
+        await setDoc(doc(db, "users", userCredential.user.uid), {
+            username: user,
+            role: role,
+            createdAt: new Date().toISOString()
+        });
+
+        await signOut(secondaryAuth);
+
+        showToast("User created successfully!");
         toggleUserMgmtModal(false);
+        await refreshUserList();
     } catch (e) {
+        console.error("Failed to create user:", e);
         showToast("Failed to create user: " + e.message);
+    }
+}
+
+// ==========================================
+// Tag Management
+// ==========================================
+window.toggleTagMgmtModal = function (show) {
+    const modal = document.getElementById('tag-mgmt-modal');
+    if (modal) modal.style.display = show ? 'flex' : 'none';
+}
+
+window.openTagMgmtModal = function () {
+    toggleTagMgmtModal(true);
+    renderTagList();
+}
+
+function renderTagList() {
+    const container = document.getElementById('tags-table-container');
+    if (!container) return;
+
+    const tagCounts = {};
+    books.forEach(b => {
+        (b.tags || []).forEach(t => {
+            const tag = t.trim();
+            if (tag) {
+                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+            }
+        });
+    });
+
+    const sortedTags = Object.entries(tagCounts).sort((a, b) => a[0].localeCompare(b[0]));
+
+    if (sortedTags.length === 0) {
+        container.innerHTML = '<p class="empty-state">No tags found.</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="width: 100%; overflow-x: auto;">
+            <table class="user-mgmt-table" style="width: 100%; text-align: left;">
+                <thead>
+                    <tr>
+                        <th>Tag Name</th>
+                        <th>Count</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sortedTags.map(([tag, count]) => `
+                        <tr>
+                            <td><span class="book-tag-chip" style="margin:0;">${escapeHTML(tag)}</span></td>
+                            <td>${count}</td>
+                            <td style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                                <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.4rem 0.6rem;" onclick="renameTag('${tag.replace(/'/g, "\\'")}')">Rename</button>
+                                <button class="btn btn-danger" style="font-size:0.75rem; padding:0.4rem 0.6rem;" onclick="deleteTag('${tag.replace(/'/g, "\\'")}')">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+window.renameTag = async function (oldTag) {
+    const newTag = prompt(`Enter new name for tag "${oldTag}":`, oldTag);
+    if (!newTag || newTag.trim() === '' || newTag === oldTag) return;
+
+    const finalTag = newTag.trim();
+    let updatedBooksCount = 0;
+
+    books.forEach(b => {
+        if (b.tags && b.tags.includes(oldTag)) {
+            // Replace the old tag with the new one
+            b.tags = b.tags.map(t => t === oldTag ? finalTag : t);
+            // Remove duplicates just in case the new tag already existed
+            b.tags = [...new Set(b.tags)];
+            updatedBooksCount++;
+        }
+    });
+
+    if (updatedBooksCount > 0) {
+        showToast(`Renaming tag in ${updatedBooksCount} books...`);
+        await saveData();
+        showToast("Tag renamed successfully.");
+        renderTagList();
+        applyFilters(); // Re-render books in UI
+        updateFilterDropdowns(); // Update tag suggestions if any
+    }
+}
+
+window.deleteTag = async function (tag) {
+    if (!confirm(`Are you sure you want to delete the tag "${tag}" from all books?`)) return;
+
+    let updatedBooksCount = 0;
+
+    books.forEach(b => {
+        if (b.tags && b.tags.includes(tag)) {
+            b.tags = b.tags.filter(t => t !== tag);
+            updatedBooksCount++;
+        }
+    });
+
+    if (updatedBooksCount > 0) {
+        showToast(`Deleting tag from ${updatedBooksCount} books...`);
+        await saveData();
+        showToast("Tag deleted successfully.");
+        renderTagList();
+        applyFilters();
+        updateFilterDropdowns();
     }
 }

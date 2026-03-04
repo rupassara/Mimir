@@ -1766,8 +1766,16 @@ select:focus {
     font-size: var(--user-author-size) !important;
 }
 
+.book-author [lang="si"] {
+    font-size: var(--user-author-sin-size, 0.9rem) !important;
+}
+
 .book-translator-row {
     font-size: var(--user-translator-size) !important;
+}
+
+.book-translator-row [lang="si"] {
+    font-size: var(--user-translator-sin-size, 0.82rem) !important;
 }
 
 /* =========================================================================
