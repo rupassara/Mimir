@@ -529,7 +529,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize Autocomplete for Book Form
     setupAutocomplete('book-name', 'name', 'autocomplete-bookname');
     setupAutocomplete('book-author', 'author', 'autocomplete-author');
+    setupAutocomplete('book-author-sinhala', 'authorSinhala', 'autocomplete-author-sinhala');
     setupAutocomplete('book-translator', 'translator', 'autocomplete-translator');
+    setupAutocomplete('book-translator-sinhala', 'translatorSinhala', 'autocomplete-translator-sinhala');
     setupAutocomplete('book-tags-input', 'tags', 'autocomplete-tags', (val) => {
         addTag(val);
         tagsInput.value = '';
@@ -1041,6 +1043,15 @@ window.searchByCreator = function (name) {
     document.querySelector('.catalog-controls').scrollIntoView({ behavior: 'smooth' });
 }
 
+window.searchByCreator = function (name) {
+    // Switch to books tab
+    switchView('view-books');
+    const globalSearch = document.getElementById('global-search');
+    globalSearch.value = name;
+    applyFilters();
+    document.querySelector('.catalog-controls').scrollIntoView({ behavior: 'smooth' });
+};
+
 // ==========================================
 // CSV Export Logic
 // ==========================================
@@ -1073,28 +1084,9 @@ function exportToCsv() {
         ].join(',');
     });
 
-    // Lending records export
-    const lendRows = lendings.map(l => {
-        const escapeCsv = (val) => {
-            if (!val) return '""';
-            const str = String(val).replace(/"/g, '""');
-            return `"${str}"`;
-        };
-        return [
-            "LOAN",
-            escapeCsv(l.borrower),
-            l.lendDate,
-            l.status,
-            l.returnDate || '',
-            escapeCsv(l.books.map(b => b.id).join(';'))
-        ].join(',');
-    });
-
     const csvContent = "\uFEFF" + [
         headers.join(','),
-        ...rows,
-        ["TYPE", "Borrower/Lendee", "Date", "Status", "Returned", "BookIDs (separated by ;) "].join(','),
-        ...lendRows
+        ...rows
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1236,6 +1228,10 @@ function renderStats() {
     const authors = new Set(books.map(b => b.author).filter(b => b));
     const totalAuthors = authors.size;
 
+    // Total Translators
+    const translators = new Set(books.map(b => b.translator).filter(b => b));
+    const totalTranslators = translators.size;
+
     // Total Tags
     const allTags = new Set();
     books.forEach(b => {
@@ -1248,6 +1244,8 @@ function renderStats() {
     // Update DOM texts
     document.getElementById('stat-total-books').textContent = totalBooks;
     document.getElementById('stat-total-authors').textContent = totalAuthors;
+    const translatorEl = document.getElementById('stat-total-translators');
+    if (translatorEl) translatorEl.textContent = totalTranslators;
     document.getElementById('stat-total-tags').textContent = totalTags;
 
     // Chart Data Generation
@@ -1317,9 +1315,9 @@ function renderStats() {
         }
     });
 
-    // Top 15 leaderboards
-    renderLeaderboard('stat-authors-list', 'author', 15);
-    renderLeaderboard('stat-translators-list', 'translator', 15);
+    // Top 20 leaderboards
+    renderLeaderboard('stat-authors-list', 'author', 20);
+    renderLeaderboard('stat-translators-list', 'translator', 20);
 
     // Lending Stats
     renderLendingSummaryStats();
@@ -1396,7 +1394,7 @@ function renderPeopleList() {
 
     container.innerHTML = `
         <!-- Merge toolbar — shown when checkboxes are selected -->
-        <div id="merge-toolbar" style="display:none; background:var(--accent-light); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.75rem 1rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+        <div id="merge-toolbar" style="display:none; position:sticky; top:0; z-index:10; background:var(--surface-color); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.75rem 1rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem; align-items:flex-end; box-shadow:var(--shadow-md);">
             <div style="flex:none; align-self:center;">
                 <span id="merge-selection-label" style="font-size:0.85rem; color:var(--text-secondary);">0 selected</span>
             </div>
@@ -1637,7 +1635,7 @@ function renderLeaderboard(containerId, field, topN = 15) {
 
     const max = sorted[0][1];
     container.innerHTML = sorted.map(([name, count], i) => `
-        <div class="stat-leaderboard-row">
+        <div class="stat-leaderboard-row" style="cursor:pointer;" onclick="searchByCreator('${name.replace(/'/g, "\\'")}')" title="Click to filter by ${escapeHTML(name)}">
             <span class="stat-leaderboard-rank">${i + 1}.</span>
             <span class="stat-leaderboard-name" title="${escapeHTML(name)}">${escapeHTML(name)}</span>
             <div class="stat-leaderboard-bar-wrap">
@@ -1741,6 +1739,14 @@ function applySettings() {
         const val = currentSettings[key] || defaults[key];
         document.documentElement.style.setProperty(prop, `${val}px`);
     });
+
+    // Populate default theme select
+    const defaultThemeSelect = document.getElementById('default-theme-select');
+    if (defaultThemeSelect) {
+        defaultThemeSelect.innerHTML = THEMES.map(t =>
+            `<option value="${t.id}" ${t.id === (currentSettings.defaultTheme || 'light') ? 'selected' : ''}>${t.name}</option>`
+        ).join('');
+    }
 }
 
 window.setTheme = function (themeId) {
@@ -1763,12 +1769,6 @@ window.setFont = function (fontFamily) {
     document.querySelectorAll('.font-card').forEach(el => {
         el.classList.toggle('active', el.dataset.font === fontFamily);
     });
-};
-
-window.resetToDefaultTheme = function () {
-    setTheme('light');
-    setFont('Inter');
-    showToast('Theme and font reset to defaults.');
 };
 
 window.toggleCategoryColors = function (on) {
@@ -2542,3 +2542,175 @@ window.deleteTag = async function (tag) {
         updateFilterDropdowns();
     }
 }
+
+// ==========================================
+// Category Management
+// ==========================================
+window.toggleCategoryMgmtModal = function (show) {
+    const modal = document.getElementById('category-mgmt-modal');
+    if (modal) modal.style.display = show ? 'flex' : 'none';
+};
+
+window.openCategoryMgmtModal = function () {
+    toggleCategoryMgmtModal(true);
+    renderCategoryList();
+};
+
+function renderCategoryList() {
+    const container = document.getElementById('categories-table-container');
+    if (!container) return;
+
+    const catCounts = {};
+    books.forEach(b => {
+        const cat = (b.category || '').trim();
+        if (cat) catCounts[cat] = (catCounts[cat] || 0) + 1;
+    });
+
+    const sortedCats = Object.entries(catCounts).sort((a, b) => a[0].localeCompare(b[0]));
+
+    if (sortedCats.length === 0) {
+        container.innerHTML = '<p class="empty-state">No categories found.</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="margin-bottom:1rem;">
+            <div style="display:flex; gap:0.5rem;">
+                <input type="text" id="new-category-input" placeholder="New category name..." style="flex:1; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--surface-color); color:var(--text-primary);">
+                <button class="btn btn-primary" onclick="addNewCategory()" style="font-size:0.85rem;">Add</button>
+            </div>
+        </div>
+        <div style="width: 100%; overflow-x: auto;">
+            <table class="user-mgmt-table" style="width: 100%; text-align: left;">
+                <thead>
+                    <tr>
+                        <th>Category Name</th>
+                        <th>Books</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sortedCats.map(([cat, count]) => `
+                        <tr>
+                            <td><strong>${escapeHTML(cat)}</strong></td>
+                            <td>${count}</td>
+                            <td style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                                <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.4rem 0.6rem;" onclick="renameCategory('${cat.replace(/'/g, "\\'")}')">Rename</button>
+                                <button class="btn btn-danger" style="font-size:0.75rem; padding:0.4rem 0.6rem;" onclick="deleteCategory('${cat.replace(/'/g, "\\'")}')">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+window.addNewCategory = function () {
+    const input = document.getElementById('new-category-input');
+    const name = (input.value || '').trim();
+    if (!name) return showToast('Category name cannot be empty.');
+
+    // Check if already exists
+    const exists = books.some(b => (b.category || '').toLowerCase() === name.toLowerCase());
+    if (exists) return showToast('Category already exists in the library.');
+
+    // Add to the select dropdown in the form
+    const select = document.getElementById('book-category');
+    if (select) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+    }
+
+    input.value = '';
+    showToast(`Category "${name}" added to the dropdown.`);
+    renderCategoryList();
+};
+
+window.renameCategory = async function (oldCat) {
+    const newCat = prompt(`Enter new name for category "${oldCat}":`, oldCat);
+    if (!newCat || newCat.trim() === '' || newCat === oldCat) return;
+
+    const finalCat = newCat.trim();
+    let updated = 0;
+
+    books.forEach(b => {
+        if ((b.category || '') === oldCat) {
+            b.category = finalCat;
+            updated++;
+        }
+    });
+
+    if (updated > 0) {
+        showToast(`Renaming category in ${updated} books...`);
+        await saveData();
+        showToast('Category renamed successfully.');
+        renderCategoryList();
+        populateFilterDropdowns();
+        applyFilters();
+    }
+};
+
+window.deleteCategory = async function (cat) {
+    const replacement = prompt(`Delete category "${cat}"?\n\nEnter a replacement category for the ${books.filter(b => b.category === cat).length} affected books (or leave blank to set to "Uncategorized"):`);
+    if (replacement === null) return; // cancelled
+
+    const newCat = replacement.trim() || 'Uncategorized';
+    let updated = 0;
+
+    books.forEach(b => {
+        if ((b.category || '') === cat) {
+            b.category = newCat;
+            updated++;
+        }
+    });
+
+    if (updated > 0) {
+        await saveData();
+        showToast(`Moved ${updated} books from "${cat}" to "${newCat}".`);
+        renderCategoryList();
+        populateFilterDropdowns();
+        applyFilters();
+    }
+};
+
+// ==========================================
+// Compact View
+// ==========================================
+window.setViewMode = function (mode) {
+    const grid = document.getElementById('books-grid');
+    grid.classList.remove('books-grid', 'books-list', 'books-compact');
+
+    document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+
+    if (mode === 'grid') {
+        grid.classList.add('books-grid');
+    } else if (mode === 'list') {
+        grid.classList.add('books-list');
+    } else if (mode === 'compact') {
+        grid.classList.add('books-compact');
+    }
+
+    const activeBtn = document.getElementById(`btn-${mode}-view`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    localStorage.setItem('mimir_view', mode);
+};
+
+// ==========================================
+// Default Theme Selection
+// ==========================================
+window.setDefaultTheme = function (themeId) {
+    currentSettings.defaultTheme = themeId;
+    saveSettings();
+    showToast(`Default theme set to "${THEMES.find(t => t.id === themeId)?.name || themeId}".`);
+};
+
+window.resetToDefaultTheme = function () {
+    const defaultThemeId = currentSettings.defaultTheme || 'light';
+    setTheme(defaultThemeId);
+    setFont('Inter');
+    showToast('Theme reset to default.');
+};
