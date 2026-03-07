@@ -106,6 +106,8 @@
                         <select id="sort-by">
                             <option value="newest">Date Added (Newest)</option>
                             <option value="oldest">Date Added (Oldest)</option>
+                            <option value="idAsc">ID (Ascending)</option>
+                            <option value="idDesc">ID (Descending)</option>
                             <option value="titleAsc">Title (A-Z)</option>
                             <option value="titleDesc">Title (Z-A)</option>
                             <option value="authorAsc">Author (A-Z)</option>
@@ -408,6 +410,15 @@
         <div class="form-card" style="max-width: 100%;">
             <h2>Lending Management</h2>
             <p class="subtitle">Track books lent to friends and family.</p>
+            <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
+                <button class="btn btn-secondary csv-btn" onclick="exportLendingCsv()" style="font-size:0.85rem;">📥
+                    Export Lending CSV</button>
+                <button class="btn btn-secondary csv-btn"
+                    onclick="document.getElementById('import-lending-csv').click()" style="font-size:0.85rem;">📤 Import
+                    Lending CSV</button>
+                <input type="file" id="import-lending-csv" accept=".csv" style="display:none;"
+                    onchange="handleLendingCsvImport(event)">
+            </div>
 
             <div class="lending-container"
                 style="display: grid; grid-template-columns: 350px 1fr; gap: 2rem; margin-top: 1.5rem;">
