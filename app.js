@@ -1080,19 +1080,21 @@ function renderTags() {
 // ==========================================
 window.searchByCreator = function (name) {
     if (!name) return;
-    globalSearch.value = name;
-    applyFilters();
-    // Scroll to top of catalog
-    document.querySelector('.catalog-controls').scrollIntoView({ behavior: 'smooth' });
-}
 
-window.searchByCreator = function (name) {
     // Switch to books tab
-    switchView('view-books');
+    const booksTab = document.querySelector('.tab-btn[data-target="view-books"]');
+    if (booksTab) booksTab.click();
+
+    // Set search and trigger filter
     const globalSearch = document.getElementById('global-search');
-    globalSearch.value = name;
-    applyFilters();
-    document.querySelector('.catalog-controls').scrollIntoView({ behavior: 'smooth' });
+    if (globalSearch) {
+        globalSearch.value = name;
+        applyFilters();
+    }
+
+    // Scroll to top of catalog
+    const controls = document.querySelector('.catalog-controls');
+    if (controls) controls.scrollIntoView({ behavior: 'smooth' });
 };
 
 // ==========================================
