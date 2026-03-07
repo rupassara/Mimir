@@ -362,6 +362,36 @@
     --accent-light: #1a0633;
 }
 
+[data-theme="cyber"] {
+    /* Cyberpunk Theme */
+    --bg-color: #000000;
+    --surface-color: #121212;
+    --text-primary: #ffffff;
+    --text-secondary: #ff6ec7;
+    --border-color: #2a002a;
+    --accent-primary: #f72585;
+    --accent-hover: #b5179e;
+    --accent-light: #1a001a;
+    --shadow-sm: 0 2px 4px rgba(247, 37, 133, 0.15);
+    --shadow-md: 0 4px 12px rgba(247, 37, 133, 0.25);
+    --shadow-lg: 0 12px 24px rgba(247, 37, 133, 0.35);
+}
+
+[data-theme="oasis"] {
+    /* Desert Oasis Theme */
+    --bg-color: #e9edc9;
+    --surface-color: #fefae0;
+    --text-primary: #2d3a1a;
+    --text-secondary: #606c38;
+    --border-color: #ccd5ae;
+    --accent-primary: #2a9d8f;
+    --accent-hover: #1f7a6e;
+    --accent-light: #d4e7e4;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
 /* =========================================================================
    Reset & Base Styles
    ========================================================================= */

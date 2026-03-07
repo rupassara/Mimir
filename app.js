@@ -331,6 +331,12 @@ async function logout() {
 // Initialization & Events
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
+    // Clear session cache for fresh data on every load
+    sessionStorage.clear();
+    if ('caches' in window) {
+        caches.keys().then(names => names.forEach(name => caches.delete(name)));
+    }
+
     await initData();
     populateFilterDropdowns();
     renderBooks();
@@ -429,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         booksGrid.classList.add('books-list');
         btnGridView.classList.remove('active');
         btnListView.classList.add('active');
-        localStorage.setItem('aurora_view', 'list');
+        localStorage.setItem('mimir_view', 'list');
     });
 
     btnGridView.addEventListener('click', () => {
@@ -437,7 +443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         booksGrid.classList.add('books-grid');
         btnListView.classList.remove('active');
         btnGridView.classList.add('active');
-        localStorage.setItem('aurora_view', 'grid');
+        localStorage.setItem('mimir_view', 'grid');
     });
 
     // Filtering & Searching
@@ -597,10 +603,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ==========================================
 
 function initTheme() {
-    const savedTheme = localStorage.getItem('aurora_theme') || 'light';
+    const savedTheme = localStorage.getItem('mimir_theme') || 'light';
     setTheme(savedTheme);
 
-    const savedView = localStorage.getItem('aurora_view') || 'list';
+    const savedView = localStorage.getItem('mimir_view') || 'list';
     if (savedView === 'grid') {
         btnGridView.click();
     } else {
@@ -610,7 +616,7 @@ function initTheme() {
 
 function setTheme(theme) {
     htmlEl.setAttribute('data-theme', theme);
-    localStorage.setItem('aurora_theme', theme);
+    localStorage.setItem('mimir_theme', theme);
 }
 
 function generateId() {
@@ -1085,7 +1091,7 @@ function exportToCsv() {
 
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", "aurora_library_export.csv");
+    link.setAttribute("download", "mimir_library_export.csv");
     link.style.visibility = 'hidden';
 
     document.body.appendChild(link);
@@ -1365,7 +1371,7 @@ function renderPeopleList() {
         const name = (book[currentPeopleField] || '').trim();
         if (!name) return;
         if (!peopleMap[name]) {
-            peopleMap[name] = { name, count: 0, sinhalaName: book[`${currentPeopleField}SinhalaName`] || '' };
+            peopleMap[name] = { name, count: 0, sinhalaName: book[`${currentPeopleField}Sinhala`] || '' };
         }
         peopleMap[name].count++;
     });
@@ -1436,7 +1442,7 @@ function renderPeopleList() {
 
 window.savePersonRow = async function (index, originalName) {
     // Find Sinhala name field key
-    const sinhalaKey = `${currentPeopleField}SinhalaName`;
+    const sinhalaKey = `${currentPeopleField}Sinhala`;
     const newName = document.getElementById(`person-name-${index}`).value.trim();
     const newSinhalaName = document.getElementById(`person-sinhala-name-${index}`).value.trim();
 
@@ -1581,7 +1587,7 @@ window.confirmCheckboxMerge = async function () {
         return;
     }
 
-    const sinhalaKey = `${currentPeopleField}SinhalaName`;
+    const sinhalaKey = `${currentPeopleField}Sinhala`;
     let totalMerged = 0;
 
     books.forEach(book => {
@@ -1636,7 +1642,7 @@ function renderLeaderboard(containerId, field, topN = 15) {
 // Settings Manager
 // ==========================================
 const THEMES = [
-    { id: 'light', name: '☀️ Aurora Light', bg: '#fcfaf8', surface: '#ffffff', accent: '#8a5a44' },
+    { id: 'light', name: '☀️ Mimir Light', bg: '#fcfaf8', surface: '#ffffff', accent: '#8a5a44' },
     { id: 'dark', name: '🌙 Midnight Dark', bg: '#1a1817', surface: '#242120', accent: '#c28b72' },
     { id: 'sepia', name: '📜 Antique Sepia', bg: '#f4ecd8', surface: '#e9dec1', accent: '#a65d3b' },
     { id: 'nord', name: '❄️ Nordic Frost', bg: '#2e3440', surface: '#3b4252', accent: '#88c0d0' },
@@ -1677,6 +1683,11 @@ const FONTS = [
     { family: 'IBM Plex Sans', name: 'IBM Plex Sans', preview: 'Aa' },
     { family: 'DM Sans', name: 'DM Sans', preview: 'Aa' },
     { family: 'Work Sans', name: 'Work Sans', preview: 'Aa' },
+    { family: 'Josefin Sans', name: 'Josefin Sans', preview: 'Aa' },
+    { family: 'Quicksand', name: 'Quicksand', preview: 'Aa' },
+    { family: 'Cabin', name: 'Cabin', preview: 'Aa' },
+    { family: 'Raleway', name: 'Raleway', preview: 'Aa' },
+    { family: 'Montserrat', name: 'Montserrat', preview: 'Aa' },
     { family: 'Noto Sans Sinhala', name: 'Noto Sinhala', preview: 'අ ශ් ම' },
 ];
 
@@ -1744,6 +1755,12 @@ window.setFont = function (fontFamily) {
     });
 };
 
+window.resetToDefaultTheme = function () {
+    setTheme('light');
+    setFont('Inter');
+    showToast('Theme and font reset to defaults.');
+};
+
 window.toggleCategoryColors = function (on) {
     currentSettings.categoryColors = on;
     saveSettings();
@@ -1763,12 +1780,12 @@ function loadGoogleFont(family) {
 }
 
 function initSettings() {
-    const saved = localStorage.getItem('aurora_settings');
+    const saved = localStorage.getItem('mimir_settings');
     if (saved) {
         currentSettings = JSON.parse(saved);
     }
     // Sync with individual storage items to be robust
-    const theme = localStorage.getItem('aurora_theme');
+    const theme = localStorage.getItem('mimir_theme');
     if (theme) currentSettings.theme = theme;
 }
 
@@ -1918,6 +1935,37 @@ async function deleteBook() {
         }
     }
 }
+
+window.flushAllBooks = async function () {
+    if (!currentUser) return showToast('Login required.');
+    if (!document.body.classList.contains('is-admin')) return showToast('Admin access required.');
+
+    if (!confirm('⚠️ WARNING: This will permanently delete ALL books from the collection.\n\nLending records will NOT be affected.\n\nAre you sure?')) return;
+    if (!confirm('🔴 FINAL CONFIRMATION: This action CANNOT be undone.\n\nType OK to proceed.')) return;
+
+    try {
+        showToast('Flushing all books...');
+        const querySnapshot = await getDocs(collection(db, "books"));
+        const batchSize = 500;
+        const docs = querySnapshot.docs;
+
+        for (let i = 0; i < docs.length; i += batchSize) {
+            const batch = writeBatch(db);
+            docs.slice(i, i + batchSize).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+
+        books = [];
+        filteredBooks = [];
+        currentPage = 1;
+        populateFilterDropdowns();
+        renderBooks();
+        showToast(`✅ All ${docs.length} books have been deleted.`);
+    } catch (error) {
+        console.error('Error flushing books:', error);
+        showToast('Failed to flush books: ' + error.message);
+    }
+};
 
 // --- Lending Logic ---
 
