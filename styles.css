@@ -2666,3 +2666,67 @@ select:focus {
 .user-mgmt-tabs .tab-btn.active {
     color: var(--accent-primary);
 }
+
+/* Animation Polish */
+.view-section {
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+.book-card {
+    animation: slideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 768px) {
+    .books-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .nav-tabs {
+        flex-wrap: wrap;
+    }
+
+    .form-row.split {
+        flex-direction: column;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .lending-container {
+        grid-template-columns: 1fr !important;
+    }
+
+    .main-header {
+        position: relative;
+    }
+}

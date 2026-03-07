@@ -343,6 +343,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
 
+    // Dark mode auto-detect on first visit
+    if (!localStorage.getItem('mimirSettings') && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
     await initData();
     populateFilterDropdowns();
     renderBooks();
@@ -452,11 +457,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         localStorage.setItem('mimir_view', 'grid');
     });
 
-    // Filtering & Searching
-    globalSearch.addEventListener('input', applyFilters);
+    // Filtering & Searching (debounced for search, direct for dropdowns)
+    let searchDebounceTimer;
+    globalSearch.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(applyFilters, 300);
+    });
     filterCategory.addEventListener('change', applyFilters);
     filterLanguage.addEventListener('change', applyFilters);
     sortBySelect.addEventListener('change', applyFilters);
+
+    // Scroll to Top
+    const scrollToTopBtn = document.getElementById('scroll-to-top-btn');
+    if (scrollToTopBtn) {
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollToTopBtn.style.display = 'flex';
+            } else {
+                scrollToTopBtn.style.display = 'none';
+            }
+        });
+    }
+
+    // Pull to Refresh (Mobile)
+    let touchStartY = 0;
+    window.addEventListener('touchstart', (e) => touchStartY = e.touches[0].clientY, { passive: true });
+    window.addEventListener('touchend', (e) => {
+        const touchEndY = e.changedTouches[0].clientY;
+        if (window.scrollY === 0 && touchEndY > touchStartY + 100) {
+            showToast("Refreshing data...");
+            initData().then(() => renderPage());
+        }
+    }, { passive: true });
+
 
     // Pagination
     prevPageBtn.addEventListener('click', () => {
@@ -513,10 +546,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 books[index] = { ...books[index], ...bookData };
             }
             showToast(`"${bookData.name}" updated successfully!`);
+            logActivity('edit', `Edited book "${bookData.name}" (ID: ${id})`);
         } else {
+            // Duplicate detection
+            const duplicate = books.find(b =>
+                b.name.toLowerCase() === bookData.name.toLowerCase() &&
+                (b.author || '').toLowerCase() === (bookData.author || '').toLowerCase()
+            );
+            if (duplicate && !confirm(`⚠️ A book with the same title and author already exists (ID: ${duplicate.id}).\n\nDo you still want to add this?`)) {
+                return;
+            }
             bookData.id = generateId();
             books.push(bookData);
             showToast(`"${bookData.name}" added successfully!`);
+            logActivity('add', `Added book "${bookData.name}" (ID: ${bookData.id})`);
         }
 
         saveData();
@@ -1202,12 +1245,18 @@ function parseCsvData(csvText) {
             }
         });
 
+        if (!confirm(`You are about to import ${newBooks.length} books. This will REPLACE your existing book database.\n\nDo you want to proceed?`)) {
+            showToast("Import cancelled.");
+            return;
+        }
+
         books = newBooks;
         saveData();
         populateFilterDropdowns();
         renderBooks();
 
         showToast(`Successfully imported ${books.length} books!`);
+        logActivity('import', `Imported ${books.length} books from CSV`);
 
     } catch (error) {
         console.error("CSV Parse Error", error);
@@ -1360,12 +1409,19 @@ let allPeople = [];
 
 window.showPeopleList = function (field) {
     currentPeopleField = field;
+    window.isShowingMergeSuggestions = false;
     document.getElementById('show-authors-btn').className = field === 'author' ? 'btn btn-primary' : 'btn btn-secondary';
     document.getElementById('show-translators-btn').className = field === 'translator' ? 'btn btn-primary' : 'btn btn-secondary';
     renderPeopleList();
 };
 
+window.findMergeSuggestions = function () {
+    window.isShowingMergeSuggestions = true;
+    renderPeopleList();
+};
+
 window.filterPeopleList = function () {
+    window.isShowingMergeSuggestions = false;
     renderPeopleList();
 };
 
@@ -1384,8 +1440,41 @@ function renderPeopleList() {
         peopleMap[name].count++;
     });
 
-    allPeople = Object.values(peopleMap).sort((a, b) => a.name.localeCompare(b.name));
-    const filtered = searchQuery ? allPeople.filter(p => p.name.toLowerCase().includes(searchQuery)) : allPeople;
+    let sortedPeople = Object.values(peopleMap);
+
+    const sortValue = document.getElementById('people-sort') ? document.getElementById('people-sort').value : 'nameAsc';
+    if (sortValue === 'nameAsc') {
+        sortedPeople.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortValue === 'nameDesc') {
+        sortedPeople.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortValue === 'countDesc') {
+        sortedPeople.sort((a, b) => b.count - a.count);
+    } else if (sortValue === 'sinAsc') {
+        sortedPeople.sort((a, b) => a.sinhalaName.localeCompare(b.sinhalaName));
+    }
+
+    allPeople = sortedPeople;
+
+    // If we're showing suggestions, filter the list to only near-duplicates
+    if (window.isShowingMergeSuggestions) {
+        const groups = {};
+        allPeople.forEach(p => {
+            const simplified = p.name.toLowerCase().replace(/[\s\.]/g, '');
+            if (!groups[simplified]) groups[simplified] = [];
+            groups[simplified].push(p);
+        });
+        const suggestionNames = new Set(Object.values(groups).filter(g => g.length > 1).flatMap(g => g.map(p => p.name)));
+        allPeople = allPeople.filter(p => suggestionNames.has(p.name));
+
+        if (allPeople.length === 0) {
+            showToast("No obvious near-duplicates found.");
+            window.isShowingMergeSuggestions = false;
+        } else {
+            showToast(`Found ${allPeople.length} possible duplicates.`);
+        }
+    }
+
+    const filtered = searchQuery ? allPeople.filter(p => p.name.toLowerCase().includes(searchQuery) || p.sinhalaName.toLowerCase().includes(searchQuery)) : allPeople;
 
     if (filtered.length === 0) {
         container.innerHTML = `<p style="color:var(--text-secondary);">No ${currentPeopleField}s found.</p>`;
@@ -2056,12 +2145,27 @@ function renderLendingBooks() {
     });
 }
 
+window.filterLendingByBorrower = function (name) {
+    const searchInput = document.getElementById('lending-search');
+    if (searchInput) {
+        searchInput.value = name;
+        renderLendingPage();
+    }
+}
+
 function renderLendingPage() {
     const activeContainer = document.getElementById('active-lendings-table-container');
     const historyContainer = document.getElementById('returned-lendings-table-container');
+    const searchInput = document.getElementById('lending-search');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
-    const active = lendings.filter(l => l.status === 'lent').sort((a, b) => new Date(b.lendDate) - new Date(a.lendDate));
-    const history = lendings.filter(l => l.status === 'returned').sort((a, b) => new Date(b.returnDate) - new Date(a.returnDate));
+    let active = lendings.filter(l => l.status === 'lent').sort((a, b) => new Date(b.lendDate) - new Date(a.lendDate));
+    let history = lendings.filter(l => l.status === 'returned').sort((a, b) => new Date(b.returnDate) - new Date(a.returnDate));
+
+    if (query) {
+        active = active.filter(l => l.borrower.toLowerCase().includes(query));
+        history = history.filter(l => l.borrower.toLowerCase().includes(query));
+    }
 
     activeContainer.innerHTML = renderLendingTable(active, true);
     historyContainer.innerHTML = renderLendingTable(history, false);
@@ -2088,7 +2192,7 @@ function renderLendingTable(data, isActive) {
 
         return `
                     <tr>
-                        <td style="font-weight:600;">${escapeHTML(l.borrower)}</td>
+                        <td style="font-weight:600; cursor:pointer;" onclick="filterLendingByBorrower('${escapeHTML(l.borrower).replace(/'/g, "\\'")}')" title="Click to see all history for ${escapeHTML(l.borrower)}">${escapeHTML(l.borrower)}</td>
                         <td>
                             <div class="lending-books-list">
                                 ${l.books.map(b => `
@@ -2714,3 +2818,33 @@ window.resetToDefaultTheme = function () {
     setFont('Inter');
     showToast('Theme reset to default.');
 };
+
+// ==========================================
+// Activity Log
+// ==========================================
+window.logActivity = function (action, details) {
+    let logs = [];
+    try {
+        logs = JSON.paste(localStorage.getItem('mimir_activity_logs') || '[]');
+    } catch (e) { }
+
+    logs.unshift({
+        timestamp: new Date().toISOString(),
+        action,
+        details
+    });
+
+    if (logs.length > 500) logs = logs.slice(0, 500); // Keep last 500
+    localStorage.setItem('mimir_activity_logs', JSON.stringify(logs));
+};
+
+// ==========================================
+// Print Catalog
+// ==========================================
+window.printCatalog = function () {
+    // We will use native print. CSS media print queries will format it.
+    showToast("Opening print dialog...");
+    window.print();
+};
+
+
