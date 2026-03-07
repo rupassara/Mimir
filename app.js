@@ -118,7 +118,10 @@ async function markReturned(lendId, bookId = null) {
         if (bookId) {
             // Mark individual book as returned
             const book = lending.books.find(b => b.id === bookId);
-            if (book) book.returned = true;
+            if (book) {
+                book.returned = true;
+                book.returnDate = new Date().toISOString().split('T')[0];
+            }
 
             // Check if all books are now returned
             const allReturned = lending.books.every(b => b.returned);
@@ -130,7 +133,10 @@ async function markReturned(lendId, bookId = null) {
             // Mark entire record as returned
             lending.status = 'returned';
             lending.returnDate = new Date().toISOString().split('T')[0];
-            lending.books.forEach(b => b.returned = true);
+            lending.books.forEach(b => {
+                b.returned = true;
+                if (!b.returnDate) b.returnDate = new Date().toISOString().split('T')[0];
+            });
         }
 
         await setDoc(doc(db, "lendings", lendId), lending);
@@ -656,6 +662,10 @@ function applyFilters() {
         baseBooks.sort((a, b) => b.id - a.id);
     } else if (sortVal === 'oldest') {
         baseBooks.sort((a, b) => a.id - b.id);
+    } else if (sortVal === 'idAsc') {
+        baseBooks.sort((a, b) => a.id - b.id);
+    } else if (sortVal === 'idDesc') {
+        baseBooks.sort((a, b) => b.id - a.id);
     } else if (sortVal === 'titleAsc') {
         baseBooks.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortVal === 'titleDesc') {
@@ -2085,7 +2095,19 @@ function renderLendingTable(data, isActive) {
                                     <div class="lending-book-item ${b.returned ? 'returned' : ''}">
                                         <div style="display:flex; align-items:center; gap:0.5rem; justify-content:space-between; width:100%;">
                                             <span><span class="lending-book-id">#${b.id}</span> ${escapeHTML(b.name)}</span>
-                                            ${(isActive && !b.returned) ? `<button class="btn-icon-tiny" title="Return this book" onclick="markReturned('${l.id}', ${b.id})">↩️</button>` : ''}
+                                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                                ${(() => {
+                if (b.returned && b.returnDate) {
+                    return `<span style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap;">returned ${b.returnDate}</span>`;
+                } else if (isActive && !b.returned) {
+                    const bookDays = Math.floor((new Date() - new Date(l.lendDate)) / (1000 * 60 * 60 * 24));
+                    const bookDayClass = bookDays > 30 ? 'days-high' : bookDays > 14 ? 'days-med' : 'days-low';
+                    return `<span class="days-count ${bookDayClass}" style="font-size:0.7rem; padding:0.15rem 0.4rem;">${bookDays}d</span>`;
+                }
+                return '';
+            })()}
+                                                ${(isActive && !b.returned) ? `<button class="btn-icon-tiny" title="Return this book" onclick="markReturned('${l.id}', ${b.id})">↩️</button>` : ''}
+                                            </div>
                                         </div>
                                     </div>`).join('')}
                             </div>
@@ -2156,6 +2178,125 @@ function renderLendingSummaryStats() {
         </div>
     `;
 }
+
+// --- Lending CSV Export / Import ---
+
+window.exportLendingCsv = function () {
+    if (lendings.length === 0) return showToast('No lending records to export.');
+
+    const escapeCsv = (val) => {
+        if (!val) return '';
+        const str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    };
+
+    const headers = ['LendingID', 'Borrower', 'LendDate', 'Status', 'ReturnDate', 'BookID', 'BookName', 'BookReturned', 'BookReturnDate'];
+    const rows = [headers.join(',')];
+
+    lendings.forEach(l => {
+        l.books.forEach(b => {
+            rows.push([
+                escapeCsv(l.id),
+                escapeCsv(l.borrower),
+                escapeCsv(l.lendDate),
+                escapeCsv(l.status),
+                escapeCsv(l.returnDate || ''),
+                escapeCsv(b.id),
+                escapeCsv(b.name),
+                b.returned ? 'true' : 'false',
+                escapeCsv(b.returnDate || '')
+            ].join(','));
+        });
+    });
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mimir_lendings_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${lendings.length} lending records.`);
+};
+
+window.handleLendingCsvImport = function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!currentUser) return showToast('Login required to import.');
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        try {
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length < 2) return showToast('CSV file is empty or invalid.');
+
+            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+            const idxMap = {};
+            headers.forEach((h, i) => idxMap[h] = i);
+
+            const required = ['LendingID', 'Borrower', 'LendDate', 'Status', 'BookID', 'BookName'];
+            const missing = required.filter(r => !(r in idxMap));
+            if (missing.length > 0) {
+                return showToast(`Missing columns: ${missing.join(', ')}`);
+            }
+
+            const lendingMap = {};
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g) || [];
+                const clean = cols.map(c => c.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+
+                const lendId = clean[idxMap['LendingID']];
+                if (!lendId) continue;
+
+                if (!lendingMap[lendId]) {
+                    lendingMap[lendId] = {
+                        id: lendId,
+                        borrower: clean[idxMap['Borrower']] || '',
+                        lendDate: clean[idxMap['LendDate']] || '',
+                        status: clean[idxMap['Status']] || 'lent',
+                        returnDate: (idxMap['ReturnDate'] !== undefined ? clean[idxMap['ReturnDate']] : '') || '',
+                        books: [],
+                        createdAt: new Date().toISOString()
+                    };
+                }
+
+                lendingMap[lendId].books.push({
+                    id: parseInt(clean[idxMap['BookID']], 10) || 0,
+                    name: clean[idxMap['BookName']] || '',
+                    returned: ((idxMap['BookReturned'] !== undefined ? clean[idxMap['BookReturned']] : '') || '').toLowerCase() === 'true',
+                    returnDate: (idxMap['BookReturnDate'] !== undefined ? clean[idxMap['BookReturnDate']] : '') || ''
+                });
+            }
+
+            const newRecords = Object.values(lendingMap);
+            if (newRecords.length === 0) return showToast('No valid lending records found in CSV.');
+
+            const existingIds = new Set(lendings.map(l => l.id));
+            const toImport = newRecords.filter(r => !existingIds.has(r.id));
+            const skipped = newRecords.length - toImport.length;
+
+            showToast(`Importing ${toImport.length} lending records...`);
+
+            for (const record of toImport) {
+                const docRef = doc(db, "lendings", record.id);
+                await setDoc(docRef, record);
+                lendings.push(record);
+            }
+
+            renderLendingPage();
+            showToast(`✅ Imported ${toImport.length} records.${skipped > 0 ? ` ${skipped} duplicates skipped.` : ''}`);
+        } catch (err) {
+            console.error('Lending CSV import error:', err);
+            showToast('Failed to import lending CSV: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+};
 
 // --- New Auth UI & User Management ---
 
