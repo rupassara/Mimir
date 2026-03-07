@@ -758,6 +758,79 @@ select:focus {
     transform: none !important;
 }
 
+/* Compact View */
+.books-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 3rem;
+}
+
+.books-compact .book-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.4rem 0.75rem;
+    gap: 0.75rem;
+    border-radius: 4px;
+}
+
+.books-compact .book-card::before {
+    display: none;
+}
+
+.books-compact .book-card .book-id {
+    font-size: 0.75rem;
+    min-width: 40px;
+}
+
+.books-compact .book-card .book-title {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    flex: 2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.books-compact .book-card .book-sinhala-title,
+.books-compact .book-card .book-translator-row,
+.books-compact .book-card .book-tags,
+.books-compact .book-card .sinhala-meta {
+    display: none;
+}
+
+.books-compact .book-card .book-author {
+    margin-bottom: 0;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.85rem;
+}
+
+.books-compact .book-card .book-meta {
+    border-top: none;
+    padding-top: 0;
+    margin-bottom: 0;
+    margin-top: 0;
+    flex: 1;
+}
+
+.books-compact .book-card .edit-book-btn {
+    top: unset !important;
+    transform: none !important;
+    right: unset !important;
+    position: static !important;
+    width: 24px;
+    height: 24px;
+}
+
+.books-compact .book-card:hover .edit-book-btn {
+    opacity: 1;
+    transform: none !important;
+}
+
 .book-card {
     background: var(--surface-color);
     border: 1px solid var(--border-color);

@@ -73,7 +73,8 @@
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <div class="view-toggles"
                                 style="display: flex; background: var(--surface); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; height: 100%;">
-                                <button id="btn-list-view" class="icon-btn" aria-label="List View"
+                                <button id="btn-list-view" class="icon-btn view-toggle-btn" aria-label="List View"
+                                    onclick="setViewMode('list')"
                                     style="border-radius: 0; border: none; padding: 0.5rem 0.75rem;">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2">
@@ -85,7 +86,8 @@
                                         <line x1="3" y1="18" x2="3.01" y2="18"></line>
                                     </svg>
                                 </button>
-                                <button id="btn-grid-view" class="icon-btn active" aria-label="Grid View"
+                                <button id="btn-grid-view" class="icon-btn view-toggle-btn active"
+                                    aria-label="Grid View" onclick="setViewMode('grid')"
                                     style="border-radius: 0; border: none; border-left: 1px solid var(--border-color); padding: 0.5rem 0.75rem;">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2">
@@ -93,6 +95,18 @@
                                         <rect x="14" y="3" width="7" height="7"></rect>
                                         <rect x="14" y="14" width="7" height="7"></rect>
                                         <rect x="3" y="14" width="7" height="7"></rect>
+                                    </svg>
+                                </button>
+                                <button id="btn-compact-view" class="icon-btn view-toggle-btn" aria-label="Compact View"
+                                    onclick="setViewMode('compact')"
+                                    style="border-radius: 0 8px 8px 0; border: none; border-left: 1px solid var(--border-color); padding: 0.5rem 0.75rem;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="3" y1="4" x2="21" y2="4"></line>
+                                        <line x1="3" y1="8" x2="21" y2="8"></line>
+                                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                                        <line x1="3" y1="16" x2="21" y2="16"></line>
+                                        <line x1="3" y1="20" x2="21" y2="20"></line>
                                     </svg>
                                 </button>
                             </div>
@@ -189,11 +203,12 @@
                                     placeholder="e.g. F. Scott Fitzgerald">
                                 <ul class="autocomplete-list" id="autocomplete-author"></ul>
                             </div>
-                            <div class="form-group">
+                            <div class="form-group autocomplete">
                                 <label for="book-author-sinhala">Author (Sinhala) <span
                                         style="font-weight:400; opacity:0.6">(සිංහල නම)</span></label>
                                 <input type="text" id="book-author-sinhala" autocomplete="off" lang="si"
                                     placeholder="e.g. එෆ්. ස්කොට් ෆිට්ස්ජෙරල්ඩ්">
+                                <ul class="autocomplete-list" id="autocomplete-author-sinhala"></ul>
                             </div>
                         </div>
 
@@ -204,11 +219,12 @@
                                     placeholder="Leave blank if none">
                                 <ul class="autocomplete-list" id="autocomplete-translator"></ul>
                             </div>
-                            <div class="form-group">
+                            <div class="form-group autocomplete">
                                 <label for="book-translator-sinhala">Translator (Sinhala) <span
                                         style="font-weight:400; opacity:0.6">(සිංහල නම)</span></label>
                                 <input type="text" id="book-translator-sinhala" autocomplete="off" lang="si"
                                     placeholder="e.g. සිංහල පරිවර්තකයා">
+                                <ul class="autocomplete-list" id="autocomplete-translator-sinhala"></ul>
                             </div>
                         </div>
 
@@ -315,6 +331,15 @@
                         style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
                         Unique Tags</h3>
                     <div id="stat-total-tags"
+                        style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
+                        0</div>
+                </div>
+                <div class="stat-card"
+                    style="background: var(--surface); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center;">
+                    <h3
+                        style="color: var(--text-muted); font-size: 1rem; margin-bottom: 0.5rem; font-family: 'Inter', sans-serif;">
+                        Total Translators</h3>
+                    <div id="stat-total-translators"
                         style="font-size: 2.5rem; font-family: 'Playfair Display', serif; color: var(--accent);">
                         0</div>
                 </div>
@@ -495,6 +520,13 @@
                     style="margin-top: 1rem; font-size: 0.85rem;">
                     🔄 Reset to Default Theme
                 </button>
+                <div style="margin-top: 1rem; display:flex; align-items:center; gap:0.75rem;">
+                    <label style="font-size:0.85rem; color:var(--text-secondary); white-space:nowrap;">Default
+                        Theme:</label>
+                    <select id="default-theme-select" onchange="setDefaultTheme(this.value)"
+                        style="flex:1; padding:0.4rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--surface-color); color:var(--text-primary); font-size:0.85rem;">
+                    </select>
+                </div>
             </div>
 
             <!-- Font Picker -->
@@ -591,6 +623,17 @@
                         <button class="btn btn-secondary auth-required" onclick="openTagMgmtModal()"
                             style="display:flex; align-items:center; gap:0.5rem; width:100%; justify-content:center;">
                             Manage Tags
+                        </button>
+                    </div>
+
+                    <!-- Category Management -->
+                    <div class="mgmt-sub-section">
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-size: 1rem;">📂 Category
+                            Management
+                        </h4>
+                        <button class="btn btn-secondary auth-required" onclick="openCategoryMgmtModal()"
+                            style="display:flex; align-items:center; gap:0.5rem; width:100%; justify-content:center;">
+                            Manage Categories
                         </button>
                     </div>
 
@@ -719,6 +762,19 @@
             </div>
         </div>
     </div>
+    <!-- Category Management Modal -->
+    <div id="category-mgmt-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card" style="max-width:600px; width:90%;">
+            <h2 style="margin-bottom:0.5rem;">📂 Manage Categories</h2>
+            <p class="subtitle" style="margin-bottom:1rem;">Add, rename, or delete categories. Changes affect all books.
+            </p>
+            <div id="categories-table-container">
+            </div>
+            <button class="btn btn-secondary" onclick="toggleCategoryMgmtModal(false)"
+                style="margin-top:1rem; width:100%;">Close</button>
+        </div>
+    </div>
+
 </body>
 
 </html>
