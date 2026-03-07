@@ -198,8 +198,9 @@
 
                         <div class="form-row split">
                             <div class="form-group autocomplete">
-                                <label for="book-author">Author *</label>
-                                <input type="text" id="book-author" required autocomplete="off"
+                                <label for="book-author">Author <span
+                                        style="font-weight:400; opacity:0.6">(optional)</span></label>
+                                <input type="text" id="book-author" autocomplete="off"
                                     placeholder="e.g. F. Scott Fitzgerald">
                                 <ul class="autocomplete-list" id="autocomplete-author"></ul>
                             </div>
@@ -416,13 +417,27 @@
                             onclick="showPeopleList('translator')">Translators</button>
                     </div>
                 </div>
-                <div class="search-bar" style="max-width:300px; width:100%;">
-                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.3-4.3" />
-                    </svg>
-                    <input type="text" id="people-search" placeholder="Search names..." class="search-input"
-                        oninput="renderPeopleList()">
+                <div
+                    style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; flex:1; justify-content:flex-end;">
+                    <button class="btn btn-secondary" onclick="findMergeSuggestions()" title="Find near-duplicate names"
+                        style="padding:0.4rem 0.8rem; height:40px; white-space:nowrap;">
+                        🤖 Find Suggestions
+                    </button>
+                    <select id="people-sort" onchange="renderPeopleList()"
+                        style="height:40px; padding:0 0.5rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--surface-color); color:var(--text-primary);">
+                        <option value="nameAsc">Name (A-Z)</option>
+                        <option value="nameDesc">Name (Z-A)</option>
+                        <option value="countDesc">Books (High-Low)</option>
+                        <option value="sinAsc">Sinhala Name</option>
+                    </select>
+                    <div class="search-bar" style="max-width:250px; width:100%; margin:0;">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.3-4.3" />
+                        </svg>
+                        <input type="text" id="people-search" placeholder="Search names..." class="search-input"
+                            oninput="renderPeopleList()">
+                    </div>
                 </div>
             </div>
 
@@ -443,6 +458,14 @@
                     Lending CSV</button>
                 <input type="file" id="import-lending-csv" accept=".csv" style="display:none;"
                     onchange="handleLendingCsvImport(event)">
+                <div class="search-bar" style="max-width:250px; flex:1; margin-left:auto;">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                    </svg>
+                    <input type="text" id="lending-search" placeholder="Search borrowers..." class="search-input"
+                        oninput="renderLendingPage()">
+                </div>
             </div>
 
             <div class="lending-container"
@@ -775,6 +798,10 @@
         </div>
     </div>
 
+    <button id="scroll-to-top-btn" onclick="window.scrollTo({top:0, behavior:'smooth'})"
+        style="display:none; position:fixed; bottom:20px; right:20px; z-index:99; background:var(--accent-primary); color:white; border:none; border-radius:50%; width:45px; height:45px; font-size:1.5rem; cursor:pointer; box-shadow:var(--shadow-md); align-items:center; justify-content:center;">
+        ↑
+    </button>
 </body>
 
 </html>
