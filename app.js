@@ -208,9 +208,11 @@ async function saveData() {
             });
             await batch.commit();
         }
+        return true;
     } catch (e) {
         console.error("Failed to save to Firebase Firestore:", e);
         showToast("Error saving to cloud database.");
+        return false;
     }
 }
 
@@ -1146,9 +1148,9 @@ function handleCsvImport(e) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
         const text = event.target.result;
-        parseCsvData(text);
+        await parseCsvData(text);
         // Reset the file input so the same file can be imported again if needed
         importCsvFile.value = '';
     };
@@ -1158,7 +1160,7 @@ function handleCsvImport(e) {
     reader.readAsText(file);
 }
 
-function parseCsvData(csvText) {
+async function parseCsvData(csvText) {
     try {
         const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
         if (lines.length < 2) {
@@ -1243,12 +1245,19 @@ function parseCsvData(csvText) {
         }
 
         books = newBooks;
-        saveData();
+        const success = await saveData();
+        if (!success) {
+            showToast("Failed to save imported books to the cloud. They will not persist after refresh.");
+            // Revert the books array if we want, but keeping them in UI might at least let them see what they imported.
+        }
+
         populateFilterDropdowns();
         renderBooks();
 
-        showToast(`Successfully imported ${books.length} books!`);
-        logActivity('import', `Imported ${books.length} books from CSV`);
+        if (success) {
+            showToast(`Successfully imported ${books.length} books!`);
+            logActivity('import', `Imported ${books.length} books from CSV`);
+        }
 
     } catch (error) {
         console.error("CSV Parse Error", error);
@@ -1417,7 +1426,7 @@ window.filterPeopleList = function () {
     renderPeopleList();
 };
 
-function renderPeopleList() {
+function renderPeopleList(silent = false) {
     const container = document.getElementById('people-list-container');
     const searchQuery = (document.getElementById('people-search').value || '').toLowerCase().trim();
 
@@ -1458,11 +1467,15 @@ function renderPeopleList() {
         const suggestionNames = new Set(Object.values(groups).filter(g => g.length > 1).flatMap(g => g.map(p => p.name)));
         allPeople = allPeople.filter(p => suggestionNames.has(p.name));
 
-        if (allPeople.length === 0) {
-            showToast("No obvious near-duplicates found.");
+        if (!silent) {
+            if (allPeople.length === 0) {
+                showToast("No obvious near-duplicates found.");
+                window.isShowingMergeSuggestions = false;
+            } else {
+                showToast(`Found ${allPeople.length} possible duplicates.`);
+            }
+        } else if (allPeople.length === 0) {
             window.isShowingMergeSuggestions = false;
-        } else {
-            showToast(`Found ${allPeople.length} possible duplicates.`);
         }
     }
 
@@ -1604,7 +1617,7 @@ window.confirmMerge = async function (index, sourceName) {
 
     await saveData();
     showToast(`✅ Merged ${merged} book(s) from "${sourceName}" → "${targetName}".`);
-    renderPeopleList();
+    renderPeopleList(true);
     applyFilters();
 };
 
@@ -1694,7 +1707,7 @@ window.confirmCheckboxMerge = async function () {
 
     await saveData();
     showToast(`✅ Merged ${totalMerged} book(s) → "${correctName}".`);
-    renderPeopleList();
+    renderPeopleList(true);
     applyFilters();
 };
 
