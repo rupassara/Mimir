@@ -1,12 +1,1 @@
-[
-    { "id": 1, "name": "The Great Gatsby", "author": "F. Scott Fitzgerald", "translator": "", "language": "English", "category": "Fiction", "tags": ["classic"] },
-    { "id": 2, "name": "1984", "author": "George Orwell", "translator": "", "language": "English", "category": "Science Fiction", "tags": ["dystopian", "classic"] },
-    { "id": 3, "name": "Madol Doova", "author": "Martin Wickramasinghe", "translator": "", "language": "Sinhala", "category": "Children", "tags": ["adventure", "local"] },
-    { "id": 4, "name": "Don Quixote", "author": "Miguel de Cervantes", "translator": "Edith Grossman", "language": "English", "category": "Fiction", "tags": ["satire"] },
-    { "id": 5, "name": "Crime and Punishment", "author": "Fyodor Dostoevsky", "translator": "Richard Pevear", "language": "English", "category": "Mystery", "tags": ["psychological"] },
-    { "id": 6, "name": "Senkottan", "author": "Mahinda Prasad Masimbula", "translator": "", "language": "Sinhala", "category": "Fiction", "tags": ["award-winning"] },
-    { "id": 7, "name": "The Hobbit", "author": "J.R.R. Tolkien", "translator": "", "language": "English", "category": "Fantasy", "tags": ["tolkien", "magic"] },
-    { "id": 8, "name": "Sapiens", "author": "Yuval Noah Harari", "translator": "", "language": "English", "category": "History", "tags": ["evolution", "science"] },
-    { "id": 9, "name": "Le Petit Prince", "author": "Antoine de Saint-Exupéry", "translator": "", "language": "French", "category": "Children", "tags": ["philosophical"] },
-    { "id": 10, "name": "Aba Yaluwo", "author": "T.B. Ilangaratne", "translator": "", "language": "Sinhala", "category": "Children", "tags": ["friendship"] }
-]
+[]
