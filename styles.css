@@ -2559,6 +2559,17 @@ select:focus {
     padding: 1.5rem;
 }
 
+.modal-card {
+    background: var(--surface-color);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    padding: 2rem;
+    position: relative;
+    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow-y: auto;
+}
+
 .modal-content {
     background: var(--surface-color);
     width: 100%;

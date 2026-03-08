@@ -375,7 +375,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     userDisplayName.textContent = (user.email || 'User').split('@')[0];
                 }
 
-                // CRITICAL: Sync lendings from cloud when auth state changes
+                // CRITICAL: Reload all data from cloud when auth state confirms user
+                await initData();
+                populateFilterDropdowns();
+                renderBooks();
                 await initLendings();
                 if (document.getElementById('view-lending').style.display !== 'none') {
                     renderLendingPage();
