@@ -53,18 +53,8 @@ async function initData() {
                 books.push(data);
             });
         } else {
-            // Fetch initial data if database is empty
-            try {
-                const response = await fetch('data.json');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                books = await response.json();
-                await saveData();
-            } catch (error) {
-                console.error("Could not load initial mock data:", error);
-                books = [];
-            }
+            // Database is empty
+            books = [];
         }
     } catch (error) {
         console.error("Firebase connection error:", error);
