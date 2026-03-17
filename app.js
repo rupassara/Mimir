@@ -1,26 +1,45 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, writeBatch, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updatePassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyB_-91cPMJeAI5z_ntghG-nl5v1IWJ2qT8",
-    authDomain: "mimir-9f5a1.firebaseapp.com",
-    projectId: "mimir-9f5a1",
-    storageBucket: "mimir-9f5a1.firebasestorage.app",
-    messagingSenderId: "83651337310",
-    appId: "1:83651337310:web:818dea8c297a763725a8cf",
-    measurementId: "G-3GL3WMLSFC",
-    databaseURL: "https://mimir-9f5a1-default-rtdb.firebaseio.com"
-};
+// ==========================================
+// Supabase Configuration
+// ==========================================
+const SUPABASE_URL = "https://ufdikjpxffpbolldssox.supabase.co";
+const SUPABASE_ANON_KEY = "sb_secret_2avcodmSOm1XyyejL2BA6g_ovoKOM3";
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const provider = null;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Secondary app to prevent admin logout when creating users
-const secondaryApp = initializeApp(firebaseConfig, "Secondary");
-const secondaryAuth = getAuth(secondaryApp);
+// ==========================================
+// Field Mapping Helpers (app camelCase <-> Supabase snake_case)
+// ==========================================
+function dbToBook(row) {
+    return {
+        id: row.id,
+        name: row.name || '',
+        sinhalaName: row.sinhala_name || '',
+        author: row.author || '',
+        authorSinhala: row.author_sinhala || '',
+        translator: row.translator || '',
+        translatorSinhala: row.translator_sinhala || '',
+        language: row.language || '',
+        category: row.category || '',
+        tags: row.tags ? (Array.isArray(row.tags) ? row.tags : []) : []
+    };
+}
+
+function bookToDb(book) {
+    return {
+        id: book.id,
+        name: book.name || '',
+        sinhala_name: book.sinhalaName || '',
+        author: book.author || '',
+        author_sinhala: book.authorSinhala || '',
+        translator: book.translator || '',
+        translator_sinhala: book.translatorSinhala || '',
+        language: book.language || '',
+        category: book.category || '',
+        tags: book.tags || []
+    };
+}
 
 // ==========================================
 // State Management
@@ -35,49 +54,79 @@ let PAGE_SIZE = 24;
 let viewMode = 'both'; // both, eng, sin
 let lendings = [];
 let lendingSelectedBooks = []; // Temporary storage for lending form
+let isLoadingData = true; // Flag to show loading state while fetching
 
-// Load data from LocalStorage or data.json
-// Load data from Firebase Firestore
+// Load data from Supabase, fall back to localStorage
 async function initData() {
     try {
-        const querySnapshot = await getDocs(collection(db, "books"));
-        if (!querySnapshot.empty) {
-            books = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                // Crucial: document ID must be used as the internal 'id' if 'id' field is missing or inconsistent
-                if (!data.id) data.id = doc.id;
-                // Ensure ID is treated consistently (some might be strings, others ints)
-                // However, the app uses parseInt(id, 10) in some places. 
-                // Let's keep the existing format but ensure it exists.
-                books.push(data);
-            });
+        const { data, error } = await supabase
+            .from('books')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            books = data.map(dbToBook);
+            saveToLocalStorage();
         } else {
-            // Database is empty
-            books = [];
+            const localBooks = loadFromLocalStorage();
+            if (localBooks && localBooks.length > 0) {
+                books = localBooks;
+                console.log(`Loaded ${books.length} books from localStorage (Supabase was empty).`);
+            } else {
+                books = [];
+            }
         }
     } catch (error) {
-        console.error("Firebase connection error:", error);
-        books = [];
-        showToast("Failed to connect to Firebase.");
+        console.error("Supabase connection error:", error);
+        const localBooks = loadFromLocalStorage();
+        if (localBooks && localBooks.length > 0) {
+            books = localBooks;
+            console.log(`Loaded ${books.length} books from localStorage (Supabase unavailable).`);
+        } else {
+            books = [];
+            showToast("Failed to connect to database.");
+        }
     }
 
-    // Filter out potential nulls
     books = (books || []).filter(b => b !== null && b !== undefined);
-
-    // Reverse to show newest first by default
-    filteredBooks = [...books].reverse();
+    filteredBooks = [...books];
 
     await initLendings();
 }
 
+// --- localStorage helpers ---
+function saveToLocalStorage() {
+    try {
+        const cleanBooks = books.filter(b => b !== null && b !== undefined);
+        localStorage.setItem('mimir_books_backup', JSON.stringify(cleanBooks));
+    } catch (e) {
+        console.warn('localStorage save failed (storage full?):', e);
+    }
+}
+
+function loadFromLocalStorage() {
+    try {
+        const raw = localStorage.getItem('mimir_books_backup');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        return null;
+    } catch (e) {
+        console.warn('localStorage load failed:', e);
+        return null;
+    }
+}
+
 async function initLendings() {
     try {
-        const querySnapshot = await getDocs(collection(db, "lendings"));
-        lendings = [];
-        querySnapshot.forEach((doc) => {
-            lendings.push({ ...doc.data(), docId: doc.id });
-        });
+        const { data, error } = await supabase
+            .from('lendings')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        lendings = data || [];
     } catch (error) {
         console.error("Error loading lendings:", error);
     }
@@ -86,9 +135,14 @@ async function initLendings() {
 async function saveLending(lendingRecord) {
     if (!currentUser) return;
     try {
-        const docRef = doc(collection(db, "lendings"));
-        const record = { ...lendingRecord, id: docRef.id, createdAt: new Date().toISOString() };
-        await setDoc(docRef, record);
+        const record = {
+            ...lendingRecord,
+            id: crypto.randomUUID(),
+            books: lendingRecord.books,
+            created_at: new Date().toISOString()
+        };
+        const { error } = await supabase.from('lendings').insert(record);
+        if (error) throw error;
         lendings.push(record);
         showToast("Lending record saved!");
         return true;
@@ -106,21 +160,17 @@ async function markReturned(lendId, bookId = null) {
         if (!lending) return;
 
         if (bookId) {
-            // Mark individual book as returned
             const book = lending.books.find(b => b.id === bookId);
             if (book) {
                 book.returned = true;
                 book.returnDate = new Date().toISOString().split('T')[0];
             }
-
-            // Check if all books are now returned
             const allReturned = lending.books.every(b => b.returned);
             if (allReturned) {
                 lending.status = 'returned';
                 lending.returnDate = new Date().toISOString().split('T')[0];
             }
         } else {
-            // Mark entire record as returned
             lending.status = 'returned';
             lending.returnDate = new Date().toISOString().split('T')[0];
             lending.books.forEach(b => {
@@ -129,10 +179,13 @@ async function markReturned(lendId, bookId = null) {
             });
         }
 
-        await setDoc(doc(db, "lendings", lendId), lending);
-        showToast(bookId ? "Book marked as returned." : "All books marked as returned.");
+        const { error } = await supabase
+            .from('lendings')
+            .update({ books: lending.books, status: lending.status, returnDate: lending.returnDate })
+            .eq('id', lendId);
+        if (error) throw error;
 
-        // Refresh everything
+        showToast(bookId ? "Book marked as returned." : "All books marked as returned.");
         renderLendingPage();
         renderStats();
         renderBooks();
@@ -152,7 +205,8 @@ async function deleteLendingRecord(lendId) {
     if (!confirm("Are you sure you want to delete this lending record permanently?")) return;
 
     try {
-        await deleteDoc(doc(db, "lendings", lendId));
+        const { error } = await supabase.from('lendings').delete().eq('id', lendId);
+        if (error) throw error;
         lendings = lendings.filter(l => l.id !== lendId);
         showToast("Lending record deleted.");
         renderLendingPage();
@@ -173,16 +227,9 @@ async function clearLendingHistory() {
     if (!confirm(`Are you sure you want to delete all ${history.length} returned records permanently?`)) return;
 
     try {
-        const BATCH_SIZE = 400;
-        for (let i = 0; i < history.length; i += BATCH_SIZE) {
-            const batch = writeBatch(db);
-            const chunk = history.slice(i, i + BATCH_SIZE);
-            chunk.forEach(l => {
-                batch.delete(doc(db, "lendings", l.id));
-            });
-            await batch.commit();
-        }
-
+        const ids = history.map(l => l.id);
+        const { error } = await supabase.from('lendings').delete().in('id', ids);
+        if (error) throw error;
         lendings = lendings.filter(l => l.status !== 'returned');
         showToast("Lending history cleared.");
         renderLendingPage();
@@ -196,22 +243,23 @@ window.clearLendingHistory = clearLendingHistory;
 
 async function saveData() {
     const cleanBooks = books.filter(b => b !== null && b !== undefined);
+
+    // Always save to localStorage first (instant, reliable)
+    saveToLocalStorage();
+
+    // Then try Supabase (upsert all changed books)
     try {
-        const BATCH_SIZE = 400;
-        for (let i = 0; i < cleanBooks.length; i += BATCH_SIZE) {
-            const batch = writeBatch(db);
-            const chunk = cleanBooks.slice(i, i + BATCH_SIZE);
-            chunk.forEach(book => {
-                // Use the book ID as the document ID for absolute consistency
-                const docRef = doc(db, "books", String(book.id));
-                batch.set(docRef, book);
-            });
-            await batch.commit();
+        const rows = cleanBooks.map(bookToDb);
+        const BATCH_SIZE = 200;
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+            const chunk = rows.slice(i, i + BATCH_SIZE);
+            const { error } = await supabase.from('books').upsert(chunk, { onConflict: 'id' });
+            if (error) throw error;
         }
         return true;
     } catch (e) {
-        console.error("Failed to save to Firebase Firestore:", e);
-        showToast("Error saving to cloud database.");
+        console.error("Failed to save to Supabase:", e);
+        showToast("Cloud save failed — data saved locally.");
         return false;
     }
 }
@@ -267,7 +315,7 @@ const sortBySelect = document.getElementById('sort-by');
 // Authentication Handlers
 // ==========================================
 
-// Map username to internal Firebase email format
+// Map username to internal Supabase email format
 function getMimirEmail(username) {
     return `${username.toLowerCase().trim()}@mimir.local`;
 }
@@ -275,51 +323,26 @@ function getMimirEmail(username) {
 async function signIn(username, password) {
     try {
         const email = getMimirEmail(username);
-
-        // On-demand seeding for admin if it doesn't exist
-        if (username === 'admin' && password === 'admin123') {
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (err) {
-                if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-                    console.log("Seeding admin account on-demand...");
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    await setDoc(doc(db, "users", userCredential.user.uid), {
-                        username: 'admin',
-                        role: 'admin',
-                        createdAt: new Date().toISOString()
-                    });
-                    console.log("Admin account seeded successfully.");
-                    // Sign in again after creation
-                    await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                    throw err;
-                }
-            }
-        } else {
-            await signInWithEmailAndPassword(auth, email, password);
-        }
-
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
         showToast("Logged in successfully!");
         return true;
     } catch (error) {
-        console.error("Login Error Details:", error.code, error.message);
+        console.error("Login Error:", error.message);
         let msg = "Login failed";
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
+        if (error.message && (error.message.includes('Invalid login') || error.message.includes('invalid_credentials') || error.message.includes('Email not confirmed'))) {
             msg = "Invalid username or password";
-        } else if (error.code === 'auth/too-many-requests') {
+        } else if (error.message && error.message.includes('rate limit')) {
             msg = "Too many failed attempts. Try again later";
         }
-        showToast(`${msg} (${error.code || 'unknown'})`);
+        showToast(`${msg}`);
         return false;
     }
 }
 
-// DEPRECATED: initAdminAccount functionality moved into signIn for security
-
 async function logout() {
     try {
-        await signOut(auth);
+        await supabase.auth.signOut();
         showToast("Logged out.");
     } catch (error) {
         console.error("Logout failed:", error);
@@ -340,7 +363,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
 
+    // Show loading state before fetching
+    isLoadingData = true;
+    renderBooks(); // Show "Loading..." state
+
     await initData();
+    isLoadingData = false;
     populateFilterDropdowns();
     renderBooks();
 
@@ -350,8 +378,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (showLoginBtn) showLoginBtn.addEventListener('click', () => toggleLoginModal(true));
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
-    // Auth State Observer
-    onAuthStateChanged(auth, async (user) => {
+    // Auth State Observer (Supabase)
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        const user = session?.user ?? null;
         currentUser = user;
         const userInfo = document.getElementById('user-info');
         const showLoginBtn = document.getElementById('show-login-btn');
@@ -362,10 +391,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (userInfo) userInfo.classList.remove('hidden');
             if (showLoginBtn) showLoginBtn.classList.add('hidden');
 
-            // Get user data for role/username
+            // Get user data for role/username from users table
             try {
-                const userDoc = await getDocs(collection(db, "users"));
-                const userData = userDoc.docs.find(d => d.id === user.uid)?.data();
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('username, role')
+                    .eq('id', user.id)
+                    .single();
+
                 if (userData) {
                     userDisplayName.textContent = userData.username;
                     if (userData.role === 'admin') {
@@ -375,7 +408,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     userDisplayName.textContent = (user.email || 'User').split('@')[0];
                 }
 
-                // CRITICAL: Reload all data from cloud when auth state confirms user
                 await initData();
                 populateFilterDropdowns();
                 renderBooks();
@@ -392,7 +424,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (userInfo) userInfo.classList.add('hidden');
             if (showLoginBtn) showLoginBtn.classList.remove('hidden');
 
-            // Redirect away from auth-required tabs if logged out
+            if (books.length === 0) {
+                await initData();
+                populateFilterDropdowns();
+                renderBooks();
+            }
+
             const activeTab = document.querySelector('.tab-btn.active');
             if (activeTab && activeTab.classList.contains('auth-required')) {
                 const homeTab = document.querySelector('.tab-btn[data-target="view-books"]');
@@ -751,14 +788,25 @@ function renderPage() {
     const totalItems = filteredBooks.length;
 
     if (totalItems === 0) {
-        booksGrid.innerHTML = `
-            <div class="empty-state">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
-                <h3>No books found</h3>
-                <p>Try adjusting your search or filters.</p>
-            </div>
-        `;
-        bookStats.textContent = 'Showing 0 books';
+        if (isLoadingData) {
+            booksGrid.innerHTML = `
+                <div class="empty-state">
+                    <div style="font-size:2rem; margin-bottom:1rem; animation: spin 1s linear infinite;">⏳</div>
+                    <h3>Loading library...</h3>
+                    <p>Fetching books from the cloud database.</p>
+                </div>
+            `;
+            bookStats.textContent = 'Loading...';
+        } else {
+            booksGrid.innerHTML = `
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                    <h3>No books found</h3>
+                    <p>Try adjusting your search or filters.</p>
+                </div>
+            `;
+            bookStats.textContent = 'Showing 0 books';
+        }
         updatePaginationInfo(0);
         return;
     }
@@ -2029,8 +2077,10 @@ async function deleteBook() {
 
     if (confirm(`Are you sure you want to delete "${book.name || 'this book'}" permanently?`)) {
         try {
-            await deleteDoc(doc(db, "books", String(id)));
+            const { error } = await supabase.from('books').delete().eq('id', id);
+            if (error) throw error;
             books = books.filter(b => b.id !== id);
+            saveToLocalStorage();
             showToast("Book deleted successfully.");
             resetForm();
             populateFilterDropdowns();
@@ -2052,22 +2102,16 @@ window.flushAllBooks = async function () {
 
     try {
         showToast('Flushing all books...');
-        const querySnapshot = await getDocs(collection(db, "books"));
-        const batchSize = 500;
-        const docs = querySnapshot.docs;
-
-        for (let i = 0; i < docs.length; i += batchSize) {
-            const batch = writeBatch(db);
-            docs.slice(i, i + batchSize).forEach(d => batch.delete(d.ref));
-            await batch.commit();
-        }
-
+        const count = books.length;
+        const { error } = await supabase.from('books').delete().neq('id', 0); // delete all
+        if (error) throw error;
         books = [];
         filteredBooks = [];
         currentPage = 1;
+        saveToLocalStorage();
         populateFilterDropdowns();
         renderBooks();
-        showToast(`✅ All ${docs.length} books have been deleted.`);
+        showToast(`✅ All ${count} books have been deleted.`);
     } catch (error) {
         console.error('Error flushing books:', error);
         showToast('Failed to flush books: ' + error.message);
@@ -2394,8 +2438,8 @@ window.handleLendingCsvImport = function (e) {
             showToast(`Importing ${toImport.length} lending records...`);
 
             for (const record of toImport) {
-                const docRef = doc(db, "lendings", record.id);
-                await setDoc(docRef, record);
+                const { error: insertErr } = await supabase.from('lendings').upsert(record);
+                if (insertErr) throw insertErr;
                 lendings.push(record);
             }
 
@@ -2461,11 +2505,13 @@ async function refreshUserList() {
     container.innerHTML = '<p class="loading">Loading users...</p>';
 
     try {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        const usersList = [];
-        querySnapshot.forEach(doc => usersList.push({ id: doc.id, ...doc.data() }));
+        const { data: usersList, error } = await supabase
+            .from('users')
+            .select('id, username, role')
+            .order('username');
+        if (error) throw error;
 
-        if (usersList.length === 0) {
+        if (!usersList || usersList.length === 0) {
             container.innerHTML = '<p>No users found.</p>';
             return;
         }
@@ -2501,15 +2547,18 @@ async function refreshUserList() {
 }
 
 window.promptResetPassword = async function (uid, username) {
-    if (!confirm(`Are you sure you want to send a password reset email to ${username}?`)) return;
+    // With Supabase, password reset requires the user's actual email.
+    // Since we use @mimir.local addresses (not real), prompt admin to set new password directly.
+    const newPass = prompt(`Enter a new password for "${username}" (min 6 chars):`);
+    if (!newPass || newPass.length < 6) return showToast('Password too short or cancelled.');
 
     try {
-        const email = getMimirEmail(username);
-        await sendPasswordResetEmail(auth, email);
-        showToast(`Password reset email sent to ${email}. Note: If this is a @mimir.local address, the user cannot receive it.`);
+        // Admin password reset via Supabase Admin API requires service_role key (not safe in browser).
+        // Best practice: use the Supabase dashboard or a server-side function.
+        showToast('To reset passwords for other users, use the Supabase Dashboard → Authentication → Users.');
     } catch (e) {
-        console.error("Failed to send reset email:", e);
-        showToast("Error sending reset email: " + e.message);
+        console.error("Failed to reset password:", e);
+        showToast("Error: " + e.message);
     }
 }
 
@@ -2525,19 +2574,25 @@ window.handleCreateUser = async function (e) {
         showToast("Creating user...");
         const email = getMimirEmail(user);
 
-        // Use secondaryAuth so the admin does not get logged out
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
+        // Sign up the new user (Supabase does not log out current user on signUp)
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password: pass });
+        if (signUpError) throw signUpError;
 
-        await setDoc(doc(db, "users", userCredential.user.uid), {
+        const newUid = signUpData.user?.id;
+        if (!newUid) throw new Error('User creation failed — no UID returned.');
+
+        // Insert into users profile table
+        const { error: insertError } = await supabase.from('users').insert({
+            id: newUid,
             username: user,
             role: role,
-            createdAt: new Date().toISOString()
+            created_at: new Date().toISOString()
         });
-
-        await signOut(secondaryAuth);
+        if (insertError) throw insertError;
 
         showToast("User created successfully!");
-        toggleUserMgmtModal(false);
+        document.getElementById('user-create-view').querySelector('form').reset();
+        showUserTab('list');
         await refreshUserList();
     } catch (e) {
         console.error("Failed to create user:", e);
