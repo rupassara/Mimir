@@ -59,15 +59,40 @@ let isLoadingData = true; // Flag to show loading state while fetching
 // Load data from Supabase, fall back to localStorage
 async function initData() {
     try {
-        const { data, error } = await supabase
-            .from('books')
-            .select('*')
-            .order('id', { ascending: false });
+        const { count: dbCount } = await supabase.from('books').select('*', { count: 'exact', head: true });
+        console.log(`Supabase reporting total: ${dbCount} books.`);
 
-        if (error) throw error;
+        let allData = [];
+        let fetchedCount = 0;
+        const pageSize = 500; // Safer chunking
+        let keepFetching = true;
 
-        if (data && data.length > 0) {
-            books = data.map(dbToBook);
+        while (keepFetching) {
+            console.log(`Fetching books range: ${fetchedCount} to ${fetchedCount + pageSize - 1}`);
+            const { data, error } = await supabase
+                .from('books')
+                .select('*')
+                .order('id', { ascending: false })
+                .range(fetchedCount, fetchedCount + pageSize - 1);
+
+            if (error) {
+                console.error("Supabase range error:", error);
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                allData = allData.concat(data);
+                fetchedCount += data.length;
+                console.log(`Chunk fetched: ${data.length} books. Total so far: ${allData.length}`);
+                if (data.length < pageSize) keepFetching = false; // Reached the end
+            } else {
+                keepFetching = false;
+            }
+        }
+        console.log(`Finished fetching. Total books: ${allData.length}`);
+
+        if (allData.length > 0) {
+            books = allData.map(dbToBook);
             saveToLocalStorage();
         } else {
             const localBooks = loadFromLocalStorage();
@@ -121,12 +146,33 @@ function loadFromLocalStorage() {
 
 async function initLendings() {
     try {
-        const { data, error } = await supabase
-            .from('lendings')
-            .select('*')
-            .order('created_at', { ascending: false });
-        if (error) throw error;
-        lendings = data || [];
+        let allData = [];
+        let fetchedCount = 0;
+        const pageSize = 500;
+        let keepFetching = true;
+
+        while (keepFetching) {
+            const { data, error } = await supabase
+                .from('lendings')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .range(fetchedCount, fetchedCount + pageSize - 1);
+
+            if (error) {
+                console.error("Lendings range error:", error);
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                allData = allData.concat(data);
+                fetchedCount += data.length;
+                if (data.length < pageSize) keepFetching = false;
+            } else {
+                keepFetching = false;
+            }
+        }
+        lendings = allData;
+        console.log(`Loaded ${lendings.length} lending records.`);
     } catch (error) {
         console.error("Error loading lendings:", error);
     }
@@ -242,6 +288,10 @@ async function clearLendingHistory() {
 window.clearLendingHistory = clearLendingHistory;
 
 async function saveData() {
+    if (!currentUser) {
+        console.warn("Unauthorized saveData attempt blocked.");
+        return false;
+    }
     const cleanBooks = books.filter(b => b !== null && b !== undefined);
 
     // Always save to localStorage first (instant, reliable)
@@ -388,6 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (user) {
             document.body.classList.add('logged-in');
+            document.querySelectorAll('.auth-required').forEach(el => el.style.display = 'flex');
             if (userInfo) userInfo.classList.remove('hidden');
             if (showLoginBtn) showLoginBtn.classList.add('hidden');
 
@@ -507,6 +558,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                 scrollToTopBtn.style.display = 'flex';
             } else {
                 scrollToTopBtn.style.display = 'none';
+            }
+        });
+    }
+
+    // --- UX Improvements (Phase 2) ---
+
+    // Header Theme Toggle (Improvement 9)
+    const headerThemeBtn = document.getElementById('header-theme-toggle');
+    if (headerThemeBtn) {
+        headerThemeBtn.addEventListener('click', () => {
+            const current = currentSettings.theme;
+            const isDarkOrSpecial = current !== 'light' && current !== 'contrast' && current !== 'sepia';
+            setTheme(isDarkOrSpecial ? 'light' : 'dark');
+        });
+    }
+
+    // Mobile Filters Toggle (Improvement 10)
+    const mobileFiltersBtn = document.getElementById('mobile-filters-btn');
+    const filtersPanel = document.getElementById('filters-panel');
+    if (mobileFiltersBtn && filtersPanel) {
+        mobileFiltersBtn.addEventListener('click', () => {
+            filtersPanel.classList.toggle('show');
+            if (filtersPanel.classList.contains('show')) {
+                mobileFiltersBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:0.5rem; vertical-align:-3px;">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg> Hide Filters`;
+            } else {
+                mobileFiltersBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:0.5rem; vertical-align:-3px;">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg> Show Filters & Sorting`;
             }
         });
     }
@@ -675,6 +758,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         lendingSearchInput.addEventListener('input', (e) => updateLendingAutocomplete(e.target.value));
     }
 
+    // Feature 17: Borrower Autocomplete
+    setupLendeeAutocomplete();
+
     // Initialize Settings UI and Themes
     initSettings();
     initTheme();
@@ -687,20 +773,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function initTheme() {
     const savedTheme = localStorage.getItem('mimir_theme') || 'light';
-    setTheme(savedTheme);
+    window.setTheme(savedTheme);
 
-    const savedView = localStorage.getItem('mimir_view') || 'list';
-    if (savedView === 'grid') {
-        btnGridView.click();
+    // Setup Layout Option Defaults
+    const lastViewMode = localStorage.getItem('mimir_view');
+    if (lastViewMode) {
+        setViewMode(lastViewMode);
+    } else if (window.innerWidth < 768) {
+        // Mobile Request: Default to Grid on Mobile if no preference
+        setViewMode('grid');
     } else {
-        btnListView.click();
+        // Default for desktop or larger screens if no preference
+        setViewMode('grid');
     }
 }
 
-function setTheme(theme) {
-    htmlEl.setAttribute('data-theme', theme);
-    localStorage.setItem('mimir_theme', theme);
-}
+// DEPRECATED: Old setTheme removed in favor of window.setTheme at line 2098
+
 
 function generateId() {
     if (books.length === 0) return 1;
@@ -815,53 +904,54 @@ function renderPage() {
     const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
     const pageItems = filteredBooks.slice(startIndex, endIndex);
 
-    booksGrid.innerHTML = pageItems.map(book => {
-        const tagsHtml = (book.tags || []).length > 0 ?
-            `<div class="book-tags">${book.tags.map(t => `<span class="book-tag-chip clickable" onclick="filterByTag('${t.replace(/'/g, "\\'")}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>${escapeHTML(t)}</span>`).join('')}</div>`
-            : '';
+    try {
+        booksGrid.innerHTML = pageItems.map(book => {
+            const tagsHtml = (book.tags || []).length > 0 ?
+                `<div class="book-tags">${book.tags.map(t => `<span class="book-tag-chip clickable" data-filter-type="tag" data-filter-value="${escapeHTML(t)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>${escapeHTML(t)}</span>`).join('')}</div>`
+                : '';
 
-        const isSin = viewMode === 'sin';
-        const isEng = viewMode === 'eng';
+            const isSin = viewMode === 'sin';
+            const isEng = viewMode === 'eng';
 
-        // Title Rendering
-        let titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>`;
-        if (isSin && book.sinhalaName) {
-            titleDisplay = `<div class="book-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
-        } else if (!isEng && book.sinhalaName) {
-            titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>
+            // Title Rendering
+            let titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>`;
+            if (isSin && book.sinhalaName) {
+                titleDisplay = `<div class="book-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
+            } else if (!isEng && book.sinhalaName) {
+                titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>
                             <div class="book-sinhala-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
-        }
-
-        // Author Rendering
-        let authorDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.author.replace(/'/g, "\\'")}')">${escapeHTML(book.author)}</div>`;
-        if (isSin && book.authorSinhala) {
-            authorDisplay = `<div class="clickable-name" lang="si" onclick="searchByCreator('${book.author.replace(/'/g, "\\'")}')">${escapeHTML(book.authorSinhala)}</div>`;
-        } else if (!isEng && book.authorSinhala) {
-            authorDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.author.replace(/'/g, "\\'")}')">${escapeHTML(book.author)}</div>
-                             <div class="sinhala-meta" lang="si">(${escapeHTML(book.authorSinhala)})</div>`;
-        }
-
-        // Translator Rendering
-        let translatorHtml = '';
-        if (book.translator || book.translatorSinhala) {
-            let transDisplay = '';
-            if (isSin && book.translatorSinhala) {
-                transDisplay = `<div class="clickable-name" lang="si" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translatorSinhala)}</div>`;
-            } else if (!isEng && book.translatorSinhala) {
-                transDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translator)}</div>
-                                 <div class="sinhala-meta" lang="si">(${escapeHTML(book.translatorSinhala)})</div>`;
-            } else {
-                transDisplay = `<div class="clickable-name" onclick="searchByCreator('${book.translator.replace(/'/g, "\\'")}')">${escapeHTML(book.translator)}</div>`;
             }
-            translatorHtml = `<div class="book-translator-row"><div class="meta-item"><div class="translator-label">Translated by</div> ${transDisplay}</div></div>`;
-        } else {
-            translatorHtml = '<div class="book-translator-row book-translator-empty"></div>';
-        }
 
-        const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => lb.id === book.id));
-        const lentBadge = isLent ? `<span class="lent-symbol" title="Currently Lent Out">🔒</span>` : '';
+            // Author Rendering
+            let authorDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.author)}</div>`;
+            if (isSin && book.authorSinhala) {
+                authorDisplay = `<div class="clickable-name" lang="si" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.authorSinhala)}</div>`;
+            } else if (!isEng && book.authorSinhala) {
+                authorDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.author)}</div>
+                             <div class="sinhala-meta" lang="si">(${escapeHTML(book.authorSinhala)})</div>`;
+            }
 
-        return `
+            // Translator Rendering
+            let translatorHtml = '';
+            if (book.translator || book.translatorSinhala) {
+                let transDisplay = '';
+                if (isSin && book.translatorSinhala) {
+                    transDisplay = `<div class="clickable-name" lang="si" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translatorSinhala)}</div>`;
+                } else if (!isEng && book.translatorSinhala) {
+                    transDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translator)}</div>
+                                 <div class="sinhala-meta" lang="si">(${escapeHTML(book.translatorSinhala)})</div>`;
+                } else {
+                    transDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translator)}</div>`;
+                }
+                translatorHtml = `<div class="book-translator-row"><div class="meta-item"><div class="translator-label">Translated by</div> ${transDisplay}</div></div>`;
+            } else {
+                translatorHtml = '<div class="book-translator-row book-translator-empty"></div>';
+            }
+
+            const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => lb.id === book.id));
+            const lentBadge = isLent ? `<span class="lent-symbol" title="Currently Lent Out">🔒</span>` : '';
+
+            return `
             <div class="book-card" data-id="${book.id}" data-category="${escapeHTML(book.category)}">
                 <div class="book-id">
                     ${String(book.id).padStart(4, '0')}
@@ -874,20 +964,49 @@ function renderPage() {
                 ${translatorHtml}
                 <div class="book-meta">
                     <div class="meta-item" style="gap: 0.75rem;">
-                        <span class="tag clickable" onclick="filterByCategory('${book.category.replace(/'/g, "\\'")}')">${escapeHTML(book.category)}</span>
+                        <span class="tag clickable" data-filter-type="category" data-filter-value="${escapeHTML(book.category)}">${escapeHTML(book.category)}</span>
                         <span class="tag" style="background: transparent; border: 1px solid var(--border-color);">${escapeHTML(book.language)}</span>
                     </div>
                 </div>
                 ${isEng ? '' : tagsHtml}
+                ${currentUser ? `
                 <button class="edit-book-btn" data-id="${book.id}" title="Edit Book">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 </button>
+                ` : ''}
             </div>
         `;
-    }).join('');
+        }).join('');
 
-    bookStats.textContent = `Showing ${startIndex + 1}-${endIndex} of ${totalItems} books`;
-    updatePaginationInfo(totalItems);
+        // Attach event listeners to newly rendered items instead of inline onclick
+        booksGrid.querySelectorAll('.clickable, .clickable-name, .tag.clickable, .book-tag-chip.clickable').forEach(el => {
+            el.addEventListener('click', (e) => {
+                const type = el.dataset.filterType;
+                const val = el.dataset.filterValue || el.innerText.trim();
+
+                if (el.classList.contains('book-tag-chip')) {
+                    filterByTag(val);
+                } else if (el.classList.contains('tag')) {
+                    filterByCategory(val);
+                } else if (el.classList.contains('clickable-name')) {
+                    searchByCreator(val);
+                }
+            });
+        });
+
+        bookStats.textContent = `Showing ${startIndex + 1}-${endIndex} of ${totalItems} books`;
+        updatePaginationInfo(totalItems);
+    } catch (error) {
+        console.error("Error rendering books page:", error);
+        booksGrid.innerHTML = `
+            <div class="empty-state">
+                <div style="font-size:3rem; margin-bottom:1rem; color:#ef4444;">⚠️</div>
+                <h3>Render Error</h3>
+                <p>An error occurred mapping the book objects to the UI. Please reload.</p>
+                <p style="font-size:0.8rem; opacity:0.7; margin-top:1rem;">${error.message}</p>
+            </div>
+        `;
+    }
 }
 
 function renderBooks() {
@@ -993,6 +1112,56 @@ function setupAutocomplete(inputId, dataField, listId, onSelect = null) {
     });
 }
 
+// Autocomplete for Borrowers (Lending form)
+function setupLendeeAutocomplete() {
+    const inputId = 'lendee-name';
+    const listId = 'autocomplete-lendee';
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(listId);
+    if (!input || !list) return;
+
+    const handleInput = () => {
+        const val = input.value.trim().toLowerCase();
+        if (!val) {
+            list.style.display = 'none';
+            return;
+        }
+
+        // Extract unique borrowers
+        const allBorrowers = lendings.map(l => l.borrower).filter(b => b);
+        const uniqueVals = [...new Set(allBorrowers)];
+
+        const matches = uniqueVals.filter(v => v.toLowerCase().includes(val)).slice(0, 5); // Limit 5
+
+        if (matches.length > 0) {
+            list.innerHTML = matches.map(m => `<li>${escapeHTML(m)}</li>`).join('');
+            list.style.display = 'block';
+
+            // Add click handlers
+            list.querySelectorAll('li').forEach(li => {
+                li.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    input.value = li.textContent;
+                    list.style.display = 'none';
+                });
+            });
+        } else {
+            list.style.display = 'none';
+        }
+    };
+
+    input.addEventListener('input', handleInput);
+    input.addEventListener('focus', () => {
+        if (input.value.trim()) handleInput();
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            list.style.display = 'none';
+        }, 200);
+    });
+}
+
 // ==========================================
 // UI Helpers
 // ==========================================
@@ -1055,13 +1224,53 @@ function startEditMode(id) {
     // Populate tags
     currentTags = [...(book.tags || [])];
     renderTags();
+
+    openModal(addBookModal);
+    document.getElementById('edit-modal-title').textContent = 'Edit Book';
+
+    // Feature 19: Lending History per Book
+    const historySection = document.getElementById('lending-history-section');
+    const historyContainer = document.getElementById('lending-history-container');
+    if (historySection && historyContainer) {
+        const thisBookLendings = lendings.filter(l =>
+            l.books && l.books.some(b => b.id === id)
+        ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        if (thisBookLendings.length > 0) {
+            historySection.style.display = 'block';
+            historyContainer.innerHTML = thisBookLendings.map(l => {
+                const lBook = l.books.find(b => b.id === id);
+                const isReturned = l.status === 'returned' || (lBook && lBook.returned);
+                const returnedStatusHtml = isReturned
+                    ? `<span style="font-size:0.8rem; color:var(--accent-primary);">Returned ${lBook && lBook.returnDate ? lBook.returnDate : ''}</span>`
+                    : `<span style="font-size:0.8rem; color:#f59e0b; font-weight:600;">Currently Borrowed</span>`;
+                return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--surface); border-bottom:1px solid var(--border-color); font-size:0.9rem;">
+                            <div>
+                                <strong style="display:block;">${escapeHTML(l.borrower)}</strong>
+                                <span style="font-size:0.8rem; color:var(--text-secondary);">${l.created_at.split('T')[0]}</span>
+                            </div>
+                            <div style="text-align:right;">
+                                ${returnedStatusHtml}
+                            </div>
+                        </div>
+                    `;
+            }).join('');
+        } else {
+            historySection.style.display = 'none';
+            historyContainer.innerHTML = '';
+        }
+    }
 }
+window.startEditMode = startEditMode;
 
 function resetForm() {
     addBookForm.reset();
     isEditing = false;
     editBookId.value = '';
-    document.getElementById('book-sinhala-name').value = '';
+    document.getElementById('edit-modal-title').textContent = 'Add New Book';
+    document.getElementById('lending-history-container').innerHTML = '';
+    document.getElementById('lending-history-section').style.display = 'none';
 
     formTitle.textContent = 'Add to Library';
     formSubtitle.textContent = 'Enter the details of the new book. Fields with suggestions will auto-complete as you type.';
@@ -1179,7 +1388,8 @@ function exportToCsv() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
 
-    const dt = new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
+    const now = new Date();
+    const dt = now.toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
 
     const link = document.createElement("a");
     link.setAttribute("href", url);
@@ -1419,11 +1629,52 @@ function renderStats() {
     });
 
     // Top 20 leaderboards
-    renderLeaderboard('stat-authors-list', 'author', 20);
-    renderLeaderboard('stat-translators-list', 'translator', 20);
+    renderLeaderboard('stat-authors-list', 'author', 15);
+    renderLeaderboard('stat-translators-list', 'translator', 15);
+
+    // Feature 25: Borrower Leaderboard
+    renderBorrowerLeaderboard();
 
     // Lending Stats
     renderLendingSummaryStats();
+}
+
+function renderBorrowerLeaderboard() {
+    const listEl = document.getElementById('stat-borrowers-list');
+    if (!listEl) return;
+
+    // Count how many total books each borrower has borrowed over all time
+    const borrowCounts = {};
+    lendings.forEach(l => {
+        if (!l.borrower) return;
+        const count = Array.isArray(l.books) ? l.books.length : 0;
+        if (count > 0) {
+            borrowCounts[l.borrower] = (borrowCounts[l.borrower] || 0) + count;
+        }
+    });
+
+    const sorted = Object.entries(borrowCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+    if (sorted.length === 0) {
+        listEl.innerHTML = '<p class="empty-state">No borrowers yet.</p>';
+        return;
+    }
+
+    listEl.innerHTML = sorted.map((item, index) => {
+        let badge = '';
+        if (index === 0) badge = '🥇';
+        else if (index === 1) badge = '🥈';
+        else if (index === 2) badge = '🥉';
+        else badge = `<span class="rank-number">#${index + 1}</span>`;
+
+        return `
+            <div class="leaderboard-item" style="cursor:default;">
+                <div class="leaderboard-rank">${badge}</div>
+                <div class="leaderboard-name" style="color:var(--text-primary);">${escapeHTML(item[0])}</div>
+                <div class="leaderboard-count">${item[1]}</div>
+            </div>
+        `;
+    }).join('');
 }
 
 function renderTagsDirectory() {
@@ -1937,13 +2188,17 @@ function loadGoogleFont(family) {
 }
 
 function initSettings() {
-    const saved = localStorage.getItem('mimir_settings');
+    const saved = localStorage.getItem('mimirSettings');
     if (saved) {
-        currentSettings = JSON.parse(saved);
+        try {
+            currentSettings = JSON.parse(saved);
+        } catch (e) {
+            console.error("Failed to parse settings:", e);
+        }
     }
-    // Sync with individual storage items to be robust
-    const theme = localStorage.getItem('mimir_theme');
-    if (theme) currentSettings.theme = theme;
+    // Sync with individual legacy storage items if present
+    const legacyTheme = localStorage.getItem('mimir_theme');
+    if (legacyTheme && !currentSettings.theme) currentSettings.theme = legacyTheme;
 }
 
 function renderSettingsPage() {
@@ -2374,7 +2629,9 @@ window.exportLendingCsv = function () {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mimir_lendings_${new Date().toISOString().split('T')[0]}.csv`;
+    const now = new Date();
+    const dt = now.toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
+    a.download = `mimir_lendings_${dt}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     showToast(`Exported ${lendings.length} lending records.`);
@@ -2544,7 +2801,9 @@ async function refreshUserList() {
         `;
     } catch (e) {
         console.error("Failed to fetch users:", e);
-        container.innerHTML = `<p class="error">Error loading users: ${e.message || JSON.stringify(e)}</p>`;
+        let errorMsg = e.message || JSON.stringify(e);
+        if (e.code === '42501') errorMsg = "Permission denied. Ensure your user profile has 'admin' role in the 'users' table.";
+        container.innerHTML = `<p class="error">Error loading users: ${errorMsg}</p>`;
     }
 }
 
@@ -2566,6 +2825,7 @@ window.promptResetPassword = async function (uid, username) {
 
 window.handleCreateUser = async function (e) {
     e.preventDefault();
+    if (!currentUser) return showToast("Login required!");
     const user = document.getElementById('new-username').value.trim();
     const pass = document.getElementById('new-password').value;
     const role = document.getElementById('new-role').value;
@@ -2874,7 +3134,7 @@ window.setViewMode = function (mode) {
 window.setDefaultTheme = function (themeId) {
     currentSettings.defaultTheme = themeId;
     saveSettings();
-    setTheme(themeId); // Instantly preview the default theme
+    window.setTheme(themeId); // Instantly preview the default theme
     showToast(`Default theme set to "${THEMES.find(t => t.id === themeId)?.name || themeId}".`);
 };
 
@@ -2884,8 +3144,8 @@ window.resetToDefaultTheme = function () {
     currentSettings.theme = systemDefault;
     currentSettings.font = 'Inter';
     saveSettings();
-    setTheme(systemDefault);
-    setFont('Inter');
+    window.setTheme(systemDefault);
+    window.setFont('Inter');
     showToast('Theme reset to system default.');
 };
 
@@ -2895,7 +3155,7 @@ window.resetToDefaultTheme = function () {
 window.logActivity = function (action, details) {
     let logs = [];
     try {
-        logs = JSON.paste(localStorage.getItem('mimir_activity_logs') || '[]');
+        logs = JSON.parse(localStorage.getItem('mimir_activity_logs') || '[]');
     } catch (e) { }
 
     logs.unshift({

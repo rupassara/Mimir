@@ -37,6 +37,25 @@
                         <button class="tab-btn auth-required" data-target="view-lending">Lending</button>
                         <button class="tab-btn" data-target="view-settings">⚙️ Settings</button>
                     </nav>
+                    <button id="header-theme-toggle" class="theme-toggle-header" title="Toggle Dark/Light Mode"
+                        aria-label="Toggle Theme">
+                        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                    </button>
                     <div class="auth-box">
                         <button id="show-login-btn" class="btn-login" onclick="toggleLoginModal(true)">Login</button>
                         <div id="user-info" class="user-profile hidden">
@@ -114,7 +133,15 @@
                     </div>
                 </div>
 
-                <div class="filters-container">
+                <button class="mobile-filters-toggle" id="mobile-filters-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="margin-right:0.5rem; vertical-align:-3px;">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    Show Filters & Sorting
+                </button>
+
+                <div class="filters-container" id="filters-panel">
                     <div class="filter-group">
                         <label for="sort-by">Sort By</label>
                         <select id="sort-by">
@@ -157,8 +184,10 @@
                     </div>
                 </div>
 
-                <div class="books-grid" id="books-grid">
-                    <!-- Cards will be populated here -->
+                <div class="books-list-wrapper">
+                    <div class="books-grid" id="books-grid">
+                        <!-- Cards will be populated here -->
+                    </div>
                 </div>
 
                 <!-- Pagination -->
@@ -289,14 +318,25 @@
                         </div>
                 </div>
 
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Book</button>
-                    <button type="button" class="btn btn-secondary" id="form-cancel-btn">Clear /
-                        Cancel</button>
-                    <button type="button" class="btn btn-danger hidden" id="delete-book-btn">Delete
-                        Book</button>
+                <!-- Feature 19: Lending History per Book -->
+                <div id="lending-history-section"
+                    style="display:none; margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color);">
+                    <h3 style="font-size:1.1rem; margin-bottom:1rem;">Lending History</h3>
+                    <div id="lending-history-container"
+                        style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-color);">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
-                </form>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Book</button>
+        <button type="button" class="btn btn-secondary" id="form-cancel-btn">Clear /
+            Cancel</button>
+        <button type="button" class="btn btn-danger hidden" id="delete-book-btn">Delete
+            Book</button>
+    </div>
+    </form>
     </div>
     </section>
 
@@ -372,9 +412,9 @@
                 <div id="tags-directory-container"></div>
             </div>
 
-            <!-- Top 15 Leaderboards -->
+            <!-- Top Leaderboards -->
             <div
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-top: 3rem;">
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin-top: 3rem;">
                 <div
                     style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
                     <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
@@ -386,6 +426,13 @@
                     <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 15
                         Translators</h3>
                     <div id="stat-translators-list"></div>
+                </div>
+                <!-- Feature 25: Borrower Leaderboard -->
+                <div class="auth-required"
+                    style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px;">
+                    <h3 style="margin-bottom: 1.25rem; font-family: 'Playfair Display', serif;">🏆 Top 10
+                        Borrowers</h3>
+                    <div id="stat-borrowers-list"></div>
                 </div>
             </div>
 
@@ -475,10 +522,11 @@
                     <form id="add-lending-form" class="card"
                         style="padding: 1.5rem; background: var(--bg-color); border-radius: var(--radius-lg); border: 1px solid var(--border-color);">
                         <h3 style="margin-top:0; margin-bottom:1rem; font-size:1.1rem;">Record New Lending</h3>
-                        <div class="form-group" style="margin-bottom: 1rem;">
+                        <div class="form-group autocomplete" style="margin-bottom: 1rem;">
                             <label for="lendee-name">Borrower Name *</label>
                             <input type="text" id="lendee-name" required placeholder="Borrower's name"
-                                class="search-input" style="width:100%;">
+                                class="search-input" style="width:100%;" autocomplete="off">
+                            <ul class="autocomplete-list" id="autocomplete-lendee" style="top:100%;"></ul>
                         </div>
                         <div class="form-group" style="margin-bottom: 1rem;">
                             <label for="lend-date">Lend Date *</label>
