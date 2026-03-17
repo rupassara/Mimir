@@ -513,6 +513,48 @@ h4 {
     background: rgba(239, 68, 68, 0.1);
 }
 
+.theme-toggle-header {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.theme-toggle-header:hover {
+    color: var(--accent-primary);
+    background: var(--surface-color);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Base Light/Dark Icon Visibility */
+html[data-theme="dark"] .icon-moon,
+html[data-theme="cyber"] .icon-moon,
+html[data-theme="void"] .icon-moon,
+html[data-theme="ocean"] .icon-moon {
+    display: none;
+}
+
+html[data-theme="dark"] .icon-sun,
+html[data-theme="cyber"] .icon-sun,
+html[data-theme="void"] .icon-sun,
+html[data-theme="ocean"] .icon-sun {
+    display: block;
+}
+
+html:not([data-theme="dark"]):not([data-theme="cyber"]):not([data-theme="void"]):not([data-theme="ocean"]) .icon-moon {
+    display: block;
+}
+
+html:not([data-theme="dark"]):not([data-theme="cyber"]):not([data-theme="void"]):not([data-theme="ocean"]) .icon-sun {
+    display: none;
+}
+
 /* Auth visibility rules */
 .auth-required {
     display: none !important;
@@ -638,6 +680,46 @@ body.logged-in #login-btn {
     box-shadow: 0 0 0 3px var(--accent-light);
 }
 
+.mobile-filters-toggle {
+    display: none;
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-lg);
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 768px) {
+    .mobile-filters-toggle {
+        display: block;
+    }
+
+    .filters-container {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filters-container.show {
+        display: flex;
+    }
+
+    .filter-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-group select {
+        width: 100%;
+    }
+}
+
 .filters-container {
     display: flex;
     justify-content: space-between;
@@ -698,11 +780,20 @@ select:focus {
     margin-bottom: 3rem;
 }
 
+.books-list-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 1rem;
+}
+
 .books-list {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     margin-bottom: 3rem;
+    min-width: 800px;
+    /* Forces scroll on small screens */
 }
 
 .books-list .book-card {
@@ -2749,5 +2840,41 @@ select:focus {
 
     .main-header {
         position: relative;
+    }
+}
+
+/* Empty States CSS */
+.empty-state-visual {
+    padding: 4rem 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    background: var(--surface-color);
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--border-color);
+}
+
+.empty-state-visual svg {
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state-visual p {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.empty-state-visual span {
+    font-size: 0.9rem;
+}
+/* Mobile Fixes */
+@media (max-width: 768px) {
+    .books-list-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .books-list-table {
+        min-width: 600px;
     }
 }
