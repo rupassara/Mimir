@@ -1179,9 +1179,11 @@ function exportToCsv() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
 
+    const dt = new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
+
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", "mimir_library_export.csv");
+    link.setAttribute("download", `mimir_library_export_${dt}.csv`);
     link.style.visibility = 'hidden';
 
     document.body.appendChild(link);
@@ -2542,7 +2544,7 @@ async function refreshUserList() {
         `;
     } catch (e) {
         console.error("Failed to fetch users:", e);
-        container.innerHTML = '<p class="error">Error loading users.</p>';
+        container.innerHTML = `<p class="error">Error loading users: ${e.message || JSON.stringify(e)}</p>`;
     }
 }
 
@@ -2872,14 +2874,19 @@ window.setViewMode = function (mode) {
 window.setDefaultTheme = function (themeId) {
     currentSettings.defaultTheme = themeId;
     saveSettings();
+    setTheme(themeId); // Instantly preview the default theme
     showToast(`Default theme set to "${THEMES.find(t => t.id === themeId)?.name || themeId}".`);
 };
 
 window.resetToDefaultTheme = function () {
-    const defaultThemeId = currentSettings.defaultTheme || 'light';
-    setTheme(defaultThemeId);
+    const systemDefault = 'light';
+    currentSettings.defaultTheme = systemDefault;
+    currentSettings.theme = systemDefault;
+    currentSettings.font = 'Inter';
+    saveSettings();
+    setTheme(systemDefault);
     setFont('Inter');
-    showToast('Theme reset to default.');
+    showToast('Theme reset to system default.');
 };
 
 // ==========================================
