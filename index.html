@@ -316,29 +316,25 @@
                                 <ul class="autocomplete-list" id="autocomplete-tags"></ul>
                             </div>
                         </div>
-                </div>
 
-                <!-- Feature 19: Lending History per Book -->
-                <div id="lending-history-section"
-                    style="display:none; margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color);">
-                    <h3 style="font-size:1.1rem; margin-bottom:1rem;">Lending History</h3>
-                    <div id="lending-history-container"
-                        style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-color);">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-    </div>
+                        <!-- Feature 19: Lending History per Book -->
+                        <div id="lending-history-section"
+                            style="display:none; margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color);">
+                            <h3 style="font-size:1.1rem; margin-bottom:1rem;">Lending History</h3>
+                            <div id="lending-history-container"
+                                style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-color);">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Book</button>
-        <button type="button" class="btn btn-secondary" id="form-cancel-btn">Clear /
-            Cancel</button>
-        <button type="button" class="btn btn-danger hidden" id="delete-book-btn">Delete
-            Book</button>
-    </div>
-    </form>
-    </div>
-    </section>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Book</button>
+                            <button type="button" class="btn btn-secondary" id="form-cancel-btn">Clear / Cancel</button>
+                            <button type="button" class="btn btn-danger hidden" id="delete-book-btn">Delete Book</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
 
     <!-- View: Statistics -->
     <section id="view-stats" class="view-section" style="display: none;">
@@ -745,7 +741,7 @@
     <!-- Notification Toast -->
     <div id="toast" class="toast">Book added successfully!</div>
 
-    <script type="module" src="app.js?v=2.0"></script>
+    <script type="module" src="app.js?v=2.2"></script>
     <!-- Login Modal -->
     <div id="login-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content login-modal-content">
