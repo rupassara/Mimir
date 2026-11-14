@@ -421,16 +421,23 @@ const viewSections = document.querySelectorAll('.view-section');
 
 // Search & Filter
 const globalSearch = document.getElementById('global-search');
+const clearSearchBtn = document.getElementById('clear-search-btn');
 const filterCategory = document.getElementById('filter-category');
 const filterLanguage = document.getElementById('filter-language');
+const filterAvailability = document.getElementById('filter-availability');
+const filterTag = document.getElementById('filter-tag');
+const resetFiltersBtn = document.getElementById('reset-filters-btn');
 const bookStats = document.getElementById('book-stats');
 const booksGrid = document.getElementById('books-grid');
 const exportCsvBtn = document.getElementById('export-csv');
 
 // Pagination
+const firstPageBtn = document.getElementById('first-page');
 const prevPageBtn = document.getElementById('prev-page');
 const nextPageBtn = document.getElementById('next-page');
+const lastPageBtn = document.getElementById('last-page');
 const pageInfo = document.getElementById('page-info');
+const jumpPageInput = document.getElementById('jump-page-input');
 
 // Form & Edit State
 const addBookForm = document.getElementById('add-book-form');
@@ -645,12 +652,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Filtering & Searching (debounced for search, direct for dropdowns)
     let searchDebounceTimer;
     globalSearch.addEventListener('input', () => {
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = globalSearch.value.trim() !== '' ? 'block' : 'none';
+        }
         clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(applyFilters, 300);
+        searchDebounceTimer = setTimeout(applyFilters, 250);
     });
+
+    globalSearch.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            clearTimeout(searchDebounceTimer);
+            applyFilters();
+        }
+    });
+
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', () => {
+            globalSearch.value = '';
+            clearSearchBtn.style.display = 'none';
+            applyFilters();
+            globalSearch.focus();
+        });
+    }
+
     filterCategory.addEventListener('change', applyFilters);
     filterLanguage.addEventListener('change', applyFilters);
+    if (filterAvailability) filterAvailability.addEventListener('change', applyFilters);
+    if (filterTag) filterTag.addEventListener('change', applyFilters);
     sortBySelect.addEventListener('change', applyFilters);
+
+    if (resetFiltersBtn) {
+        resetFiltersBtn.addEventListener('click', resetAllFilters);
+    }
 
     // Scroll to Top
     const scrollToTopBtn = document.getElementById('scroll-to-top-btn');
@@ -664,7 +697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- UX Improvements (Phase 2) ---
+    // --- UX Improvements (Phase 2 & v2.3) ---
 
     // Header Theme Toggle (Improvement 9)
     const headerThemeBtn = document.getElementById('header-theme-toggle');
@@ -696,6 +729,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Mobile Bottom Navigation Bar (Item 4)
+    const mobNavBtns = document.querySelectorAll('.mob-nav-btn');
+    mobNavBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.dataset.target;
+            const correspondingTab = document.querySelector(`.tab-btn[data-target="${targetId}"]`);
+            if (correspondingTab) {
+                correspondingTab.click();
+            }
+            mobNavBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+
+    // Sync tab button clicks to mobile nav
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.dataset.target;
+            mobNavBtns.forEach(b => {
+                b.classList.toggle('active', b.dataset.target === targetId);
+            });
+        });
+    });
+
     // Pull to Refresh (Mobile)
     let touchStartY = 0;
     window.addEventListener('touchstart', (e) => touchStartY = e.touches[0].clientY, { passive: true });
@@ -707,21 +764,77 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, { passive: true });
 
+    // Enhanced Pagination (Item 1)
+    if (firstPageBtn) {
+        firstPageBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage = 1;
+                renderPage();
+                scrollToGridTop();
+            }
+        });
+    }
 
-    // Pagination
     prevPageBtn.addEventListener('click', () => {
         if (currentPage > 1) {
             currentPage--;
             renderPage();
+            scrollToGridTop();
         }
     });
 
     nextPageBtn.addEventListener('click', () => {
-        const maxPage = Math.ceil(filteredBooks.length / PAGE_SIZE);
+        const maxPage = Math.max(1, Math.ceil(filteredBooks.length / PAGE_SIZE));
         if (currentPage < maxPage) {
             currentPage++;
             renderPage();
+            scrollToGridTop();
         }
+    });
+
+    if (lastPageBtn) {
+        lastPageBtn.addEventListener('click', () => {
+            const maxPage = Math.max(1, Math.ceil(filteredBooks.length / PAGE_SIZE));
+            if (currentPage < maxPage) {
+                currentPage = maxPage;
+                renderPage();
+                scrollToGridTop();
+            }
+        });
+    }
+
+    if (jumpPageInput) {
+        jumpPageInput.addEventListener('change', (e) => {
+            const maxPage = Math.max(1, Math.ceil(filteredBooks.length / PAGE_SIZE));
+            let val = parseInt(e.target.value, 10);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > maxPage) val = maxPage;
+            currentPage = val;
+            renderPage();
+            scrollToGridTop();
+        });
+    }
+
+    // Modal Accessibility & Keyboard Navigation (Item 19)
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            toggleLoginModal(false);
+            toggleTagMgmtModal(false);
+            toggleCategoryMgmtModal(false);
+            toggleUserMgmtModal(false);
+            if (typeof toggleActivityLogModal === 'function') toggleActivityLogModal(false);
+            const lendingResults = document.getElementById('lending-search-results');
+            if (lendingResults) lendingResults.style.display = 'none';
+        }
+    });
+
+    // Close modals on clicking backdrop
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
     });
 
     // Grid Delegate clicks for Edit
@@ -908,6 +1021,123 @@ function initTheme() {
 // DEPRECATED: Old setTheme removed in favor of window.setTheme at line 2098
 
 
+function scrollToGridTop() {
+    const el = document.getElementById('books-grid') || document.querySelector('.search-bar-container');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Singlish Phonetic Transliteration (Item 8)
+function singlishToSinhala(text) {
+    if (!text || typeof text !== 'string') return '';
+    let s = text.toLowerCase().trim();
+
+    const multiMap = [
+        ['aae', 'ඈ'], ['aa', 'ආ'], ['ae', 'ඇ'], ['ii', 'ඊ'], ['ee', 'ඊ'],
+        ['uu', 'ඌ'], ['oo', 'ඌ'], ['ei', 'ඒ'], ['ou', 'ඖ'], ['ai', 'ඓ'],
+        ['au', 'ඖ'], ['th', 'ත'], ['dh', 'ද'], ['sh', 'ශ'], ['ch', 'ච'],
+        ['kh', 'ඛ'], ['gh', 'ඝ'], ['ph', 'ඵ'], ['bh', 'භ'], ['jh', 'ඣ'],
+        ['gn', 'ඥ'], ['nd', 'ඳ'], ['mb', 'ඹ'], ['ng', 'ඟ']
+    ];
+
+    const conMap = {
+        'k': 'ක', 'g': 'ග', 'c': 'ච', 'j': 'ජ', 't': 'ට', 'd': 'ඩ',
+        'n': 'න', 'p': 'ප', 'b': 'බ', 'm': 'ම', 'y': 'ය', 'r': 'ර',
+        'l': 'ල', 'w': 'ව', 'v': 'ව', 's': 'ස', 'h': 'හ'
+    };
+
+    const vowelDiacritics = [
+        ['aae', 'ෑ'], ['aa', 'ා'], ['ae', 'ැ'], ['ii', 'ී'], ['ee', 'ී'],
+        ['uu', 'ූ'], ['oo', 'ූ'], ['ei', 'ේ'], ['ou', 'ෞ'], ['ai', 'ෛ'],
+        ['au', 'ෞ'], ['a', ''], ['i', 'ි'], ['u', 'ු'], ['e', 'ෙ'], ['o', 'ො']
+    ];
+
+    const standaloneVowels = {
+        'a': 'අ', 'i': 'ඉ', 'u': 'උ', 'e': 'එ', 'o': 'ඔ'
+    };
+
+    let result = '';
+    let i = 0;
+    while (i < s.length) {
+        let matchedConsonant = '';
+        let conLen = 0;
+        for (const [m, c] of multiMap) {
+            if (s.startsWith(m, i) && !['aae','aa','ae','ii','ee','uu','oo','ei','ou','ai','au'].includes(m)) {
+                matchedConsonant = c;
+                conLen = m.length;
+                break;
+            }
+        }
+        if (!matchedConsonant && conMap[s[i]]) {
+            matchedConsonant = conMap[s[i]];
+            conLen = 1;
+        }
+
+        if (matchedConsonant) {
+            i += conLen;
+            let matchedVowel = '';
+            let vLen = 0;
+            for (const [v, d] of vowelDiacritics) {
+                if (s.startsWith(v, i)) {
+                    matchedVowel = d;
+                    vLen = v.length;
+                    break;
+                }
+            }
+            if (vLen > 0) {
+                result += matchedConsonant + matchedVowel;
+                i += vLen;
+            } else {
+                result += matchedConsonant + '්';
+            }
+        } else {
+            let matchedStandalone = '';
+            let vLen = 0;
+            for (const [v, d] of multiMap) {
+                if (s.startsWith(v, i) && ['aae','aa','ae','ii','ee','uu','oo','ei','ou','ai','au'].includes(v)) {
+                    matchedStandalone = d;
+                    vLen = v.length;
+                    break;
+                }
+            }
+            if (!matchedStandalone && standaloneVowels[s[i]]) {
+                matchedStandalone = standaloneVowels[s[i]];
+                vLen = 1;
+            }
+
+            if (matchedStandalone) {
+                result += matchedStandalone;
+                i += vLen;
+            } else {
+                result += s[i];
+                i++;
+            }
+        }
+    }
+    return result;
+}
+
+function normalizeSinhala(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text.toLowerCase()
+        .replace(/ළ/g, 'ල')
+        .replace(/ණ/g, 'න')
+        .replace(/[ශෂ]/g, 'ස')
+        .replace(/ෘ/g, 'ු')
+        .replace(/ෲ/g, 'ූ');
+}
+
+function resetAllFilters() {
+    globalSearch.value = '';
+    if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+    filterCategory.value = '';
+    filterLanguage.value = '';
+    if (filterAvailability) filterAvailability.value = '';
+    if (filterTag) filterTag.value = '';
+    sortBySelect.value = 'newest';
+    applyFilters();
+    showToast('Filters reset.');
+}
+
 function generateId() {
     if (books.length === 0) return 1;
     const maxId = Math.max(...books.map(b => b.id));
@@ -915,18 +1145,26 @@ function generateId() {
 }
 
 function populateFilterDropdowns() {
-    const categories = [...new Set(books.map(b => b.category))].sort();
-    const languages = [...new Set(books.map(b => b.language))].sort();
+    const categories = [...new Set(books.map(b => b.category).filter(Boolean))].sort();
+    const languages = [...new Set(books.map(b => b.language).filter(Boolean))].sort();
+    const allTags = [...new Set(books.flatMap(b => b.tags || []).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
     // Preserve current selection if possible
     const currentCat = filterCategory.value;
     const currentLang = filterLanguage.value;
+    const currentTag = filterTag ? filterTag.value : '';
 
     filterCategory.innerHTML = '<option value="">All Categories</option>' +
         categories.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
 
     filterLanguage.innerHTML = '<option value="">All Languages</option>' +
         languages.map(l => `<option value="${escapeHTML(l)}">${escapeHTML(l)}</option>`).join('');
+
+    if (filterTag) {
+        filterTag.innerHTML = '<option value="">All Tags</option>' +
+            allTags.map(t => `<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('');
+        if (allTags.includes(currentTag)) filterTag.value = currentTag;
+    }
 
     if (categories.includes(currentCat)) filterCategory.value = currentCat;
     if (languages.includes(currentLang)) filterLanguage.value = currentLang;
@@ -937,10 +1175,12 @@ function applyFilters() {
     const cat = filterCategory.value;
     const lang = filterLanguage.value;
     const sortVal = sortBySelect.value;
+    const availabilityVal = filterAvailability ? filterAvailability.value : '';
+    const tagVal = filterTag ? filterTag.value : '';
 
     let baseBooks = [...books];
 
-    // Sorting Logic
+    // Sorting Logic (Item 10: Sinhala Alphabetical Sorting)
     if (sortVal === 'newest') {
         baseBooks.sort((a, b) => b.id - a.id);
     } else if (sortVal === 'oldest') {
@@ -953,25 +1193,51 @@ function applyFilters() {
         baseBooks.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortVal === 'titleDesc') {
         baseBooks.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortVal === 'titleSinAsc') {
+        baseBooks.sort((a, b) => (a.sinhalaName || a.name).localeCompare(b.sinhalaName || b.name, 'si', { sensitivity: 'base' }));
     } else if (sortVal === 'authorAsc') {
         baseBooks.sort((a, b) => a.author.localeCompare(b.author));
+    } else if (sortVal === 'authorSinAsc') {
+        baseBooks.sort((a, b) => (a.authorSinhala || a.author).localeCompare(b.authorSinhala || b.author, 'si', { sensitivity: 'base' }));
     }
 
     const queryNumeric = !isNaN(query) && query !== "" ? parseInt(query, 10) : null;
+    const isLatinOnly = /^[a-zA-Z0-9\s]+$/.test(query);
+    const querySin = (isLatinOnly && query) ? singlishToSinhala(query) : '';
+    const querySinNorm = querySin ? normalizeSinhala(querySin) : '';
+    const queryNorm = normalizeSinhala(query);
 
     filteredBooks = baseBooks.filter(b => {
-        // Dropdown filters
+        // Multi-Facet Dropdown filters (Item 2)
         if (cat && b.category !== cat) return false;
         if (lang && b.language !== lang) return false;
+        if (tagVal && !(b.tags || []).includes(tagVal)) return false;
 
-        // Text Search
+        if (availabilityVal) {
+            const isLent = lendings.some(l => l.status === 'lent' && Array.isArray(l.books) && l.books.some(lb => String(lb.id) === String(b.id) && !lb.returned));
+            if (availabilityVal === 'available' && isLent) return false;
+            if (availabilityVal === 'lent' && !isLent) return false;
+        }
+
+        // Text Search with Singlish Transliteration (Item 8)
         if (query) {
-            // Prioritize Book ID (but don't return true yet, just include it)
             if (queryNumeric !== null && b.id === queryNumeric) return true;
 
             const tagsStr = (b.tags || []).join(' ');
             const searchable = `${b.name} ${b.sinhalaName || ''} ${b.author} ${b.authorSinhala || ''} ${b.translator || ''} ${b.translatorSinhala || ''} ${b.category} ${b.language} ${tagsStr}`.toLowerCase();
-            return searchable.includes(query);
+            if (searchable.includes(query)) return true;
+
+            // Check Singlish transliteration against Sinhala fields
+            if (querySinNorm) {
+                const sinCombined = normalizeSinhala(`${b.sinhalaName || ''} ${b.authorSinhala || ''} ${b.translatorSinhala || ''}`);
+                if (sinCombined.includes(querySinNorm)) return true;
+            }
+            if (queryNorm) {
+                const sinCombined = normalizeSinhala(`${b.sinhalaName || ''} ${b.authorSinhala || ''} ${b.translatorSinhala || ''}`);
+                if (sinCombined.includes(queryNorm)) return true;
+            }
+
+            return false;
         }
 
         return true;
@@ -1022,6 +1288,8 @@ function renderPage() {
     const pageItems = filteredBooks.slice(startIndex, endIndex);
 
     try {
+        const sinFirst = currentSettings.bilingualPrecedence === 'sin-first';
+
         booksGrid.innerHTML = pageItems.map(book => {
             const tagsHtml = (book.tags || []).length > 0 ?
                 `<div class="book-tags">${book.tags.map(t => `<span class="book-tag-chip clickable" data-filter-type="tag" data-filter-value="${escapeHTML(t)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>${escapeHTML(t)}</span>`).join('')}</div>`
@@ -1030,22 +1298,32 @@ function renderPage() {
             const isSin = viewMode === 'sin';
             const isEng = viewMode === 'eng';
 
-            // Title Rendering
+            // Title Rendering (Item 9: Bilingual Precedence)
             let titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>`;
             if (isSin && book.sinhalaName) {
                 titleDisplay = `<div class="book-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
             } else if (!isEng && book.sinhalaName) {
-                titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>
-                            <div class="book-sinhala-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
+                if (sinFirst) {
+                    titleDisplay = `<div class="book-title" lang="si">${escapeHTML(book.sinhalaName)}</div>
+                                <div class="book-sinhala-title">${escapeHTML(book.name)}</div>`;
+                } else {
+                    titleDisplay = `<div class="book-title">${escapeHTML(book.name)}</div>
+                                <div class="book-sinhala-title" lang="si">${escapeHTML(book.sinhalaName)}</div>`;
+                }
             }
 
-            // Author Rendering
+            // Author Rendering (Item 9: Bilingual Precedence)
             let authorDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.author)}</div>`;
             if (isSin && book.authorSinhala) {
                 authorDisplay = `<div class="clickable-name" lang="si" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.authorSinhala)}</div>`;
             } else if (!isEng && book.authorSinhala) {
-                authorDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.author)}</div>
-                             <div class="sinhala-meta" lang="si">(${escapeHTML(book.authorSinhala)})</div>`;
+                if (sinFirst) {
+                    authorDisplay = `<div class="clickable-name" lang="si" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.authorSinhala)}</div>
+                                 <div class="sinhala-meta">(${escapeHTML(book.author)})</div>`;
+                } else {
+                    authorDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.author)}">${escapeHTML(book.author)}</div>
+                                 <div class="sinhala-meta" lang="si">(${escapeHTML(book.authorSinhala)})</div>`;
+                }
             }
 
             // Translator Rendering
@@ -1055,8 +1333,13 @@ function renderPage() {
                 if (isSin && book.translatorSinhala) {
                     transDisplay = `<div class="clickable-name" lang="si" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translatorSinhala)}</div>`;
                 } else if (!isEng && book.translatorSinhala) {
-                    transDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translator)}</div>
-                                 <div class="sinhala-meta" lang="si">(${escapeHTML(book.translatorSinhala)})</div>`;
+                    if (sinFirst) {
+                        transDisplay = `<div class="clickable-name" lang="si" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translatorSinhala)}</div>
+                                     <div class="sinhala-meta">(${escapeHTML(book.translator)})</div>`;
+                    } else {
+                        transDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translator)}</div>
+                                     <div class="sinhala-meta" lang="si">(${escapeHTML(book.translatorSinhala)})</div>`;
+                    }
                 } else {
                     transDisplay = `<div class="clickable-name" data-filter-type="author" data-filter-value="${escapeHTML(book.translator)}">${escapeHTML(book.translator)}</div>`;
                 }
@@ -1134,18 +1417,27 @@ function updatePaginationInfo(totalItems) {
     const maxPage = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
     pageInfo.textContent = `Page ${currentPage} of ${maxPage}`;
 
+    if (firstPageBtn) firstPageBtn.disabled = currentPage <= 1;
     prevPageBtn.disabled = currentPage <= 1;
     nextPageBtn.disabled = currentPage >= maxPage;
+    if (lastPageBtn) lastPageBtn.disabled = currentPage >= maxPage;
+
+    if (jumpPageInput) {
+        jumpPageInput.value = currentPage;
+        jumpPageInput.max = maxPage;
+    }
 
     // Render per-page selector if it doesn't already exist
     if (!document.getElementById('per-page-select')) {
         const perPageSelect = document.createElement('select');
         perPageSelect.id = 'per-page-select';
         perPageSelect.className = 'per-page-select';
+        perPageSelect.style.cssText = 'padding:0.4rem 0.6rem; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--surface-color); color:var(--text-primary); font-size:0.85rem; margin-right:0.5rem;';
         perPageSelect.innerHTML = `
-            <option value="15">15 / page</option>
-            <option value="50">50 / page</option>
-            <option value="100">100 / page</option>
+            <option value="12">12 / page</option>
+            <option value="24">24 / page</option>
+            <option value="48">48 / page</option>
+            <option value="96">96 / page</option>
             <option value="99999">View All</option>
         `;
         perPageSelect.value = PAGE_SIZE;
@@ -1153,9 +1445,11 @@ function updatePaginationInfo(totalItems) {
             PAGE_SIZE = parseInt(e.target.value, 10);
             currentPage = 1;
             renderPage();
+            scrollToGridTop();
         };
-        // Insert before prev button
-        prevPageBtn.parentElement.insertBefore(perPageSelect, prevPageBtn);
+        // Insert before first button or prev button
+        const targetBtn = firstPageBtn || prevPageBtn;
+        targetBtn.parentElement.insertBefore(perPageSelect, targetBtn);
     } else {
         document.getElementById('per-page-select').value = PAGE_SIZE;
     }
@@ -1282,13 +1576,64 @@ function setupLendeeAutocomplete() {
 // ==========================================
 // UI Helpers
 // ==========================================
-function showToast(message) {
-    toastInfo.textContent = message;
-    toastInfo.classList.add('show');
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) {
+        if (toastInfo) {
+            toastInfo.textContent = message;
+            toastInfo.classList.add('show');
+            setTimeout(() => toastInfo.classList.remove('show'), 3000);
+        }
+        return;
+    }
+
+    // Auto-detect type if not explicitly passed
+    let toastType = type;
+    const lower = String(message).toLowerCase();
+    if (type === 'info') {
+        if (lower.includes('error') || lower.includes('failed') || lower.includes('invalid') || lower.includes('denied') || lower.includes('short')) {
+            toastType = 'error';
+        } else if (lower.includes('success') || lower.includes('saved') || lower.includes('created') || lower.includes('restored') || lower.includes('logged in')) {
+            toastType = 'success';
+        } else if (lower.includes('warning') || lower.includes('caution') || lower.includes('refreshing')) {
+            toastType = 'warning';
+        }
+    }
+
+    const toastItem = document.createElement('div');
+    toastItem.className = `toast-item toast-${toastType}`;
+
+    let icon = 'ℹ️';
+    if (toastType === 'success') icon = '✓';
+    else if (toastType === 'error') icon = '⚠️';
+    else if (toastType === 'warning') icon = '⚡';
+
+    toastItem.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700;">${icon}</span>
+            <span>${escapeHTML(message)}</span>
+        </div>
+        <button class="toast-close" aria-label="Dismiss">&times;</button>
+    `;
+
+    const closeBtn = toastItem.querySelector('.toast-close');
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            toastItem.style.opacity = '0';
+            toastItem.style.transform = 'translateY(8px)';
+            setTimeout(() => toastItem.remove(), 250);
+        };
+    }
+
+    container.appendChild(toastItem);
 
     setTimeout(() => {
-        toastInfo.classList.remove('show');
-    }, 3000);
+        if (toastItem.parentNode) {
+            toastItem.style.opacity = '0';
+            toastItem.style.transform = 'translateY(8px)';
+            setTimeout(() => toastItem.remove(), 250);
+        }
+    }, 3800);
 }
 
 // Simple HTML escaper to prevent XSS
@@ -2230,7 +2575,8 @@ let currentSettings = {
     theme: 'light',
     font: 'Inter',
     categoryColors: false,
-    enableDelete: false
+    enableDelete: false,
+    bilingualPrecedence: 'eng-first'
 };
 
 function loadSettings() {
@@ -2268,6 +2614,17 @@ function applySettings() {
         const val = currentSettings[key] || defaults[key];
         document.documentElement.style.setProperty(prop, `${val}px`);
     });
+
+    // Sync Bilingual Precedence (Item 9)
+    const engRadio = document.getElementById('bilingual-eng-first');
+    const sinRadio = document.getElementById('bilingual-sin-first');
+    if (engRadio && sinRadio) {
+        if (currentSettings.bilingualPrecedence === 'sin-first') {
+            sinRadio.checked = true;
+        } else {
+            engRadio.checked = true;
+        }
+    }
 
     // Populate default theme select
     const defaultThemeSelect = document.getElementById('default-theme-select');
@@ -2429,6 +2786,13 @@ window.updateFontSize = function (type, pxVal) {
     // Update label
     const label = document.getElementById(`lbl-${type}-size`);
     if (label) label.textContent = `${px}px`;
+};
+
+window.setBilingualPrecedence = function (val) {
+    currentSettings.bilingualPrecedence = val;
+    saveSettings();
+    renderPage();
+    showToast(`Display order: ${val === 'sin-first' ? 'Sinhala first' : 'English first'}`);
 };
 
 // --- Library Management ---
@@ -2690,51 +3054,112 @@ function renderLendingSummaryStats() {
     const container = document.getElementById('stat-lending-summary');
     if (!container) return;
 
-    const activeLendings = lendings.filter(l => l.status === 'lent');
-    const totalLentBooks = activeLendings.reduce((sum, l) => sum + (Array.isArray(l.books) ? l.books.filter(b => !b.returned).length : 0), 0);
+    const todayStr = new Date().toISOString().split('T')[0];
 
-    // Borrower Stats
-    const borrowerCounts = {};
-    activeLendings.forEach(l => {
-        const unreturnedCount = Array.isArray(l.books) ? l.books.filter(b => !b.returned).length : 0;
-        if (unreturnedCount > 0 && l.borrower) {
-            borrowerCounts[l.borrower] = (borrowerCounts[l.borrower] || 0) + unreturnedCount;
+    let totalCirculations = 0;
+    let returnedBooksCount = 0;
+    let activeBooksCount = 0;
+    let overdueBooksCount = 0;
+
+    const borrowerStats = {};
+    const bookBorrowCounts = {};
+
+    lendings.forEach(l => {
+        const booksInLending = Array.isArray(l.books) ? l.books : [];
+        const isLendingOverdue = l.status === 'lent' && l.returnDate && l.returnDate < todayStr;
+
+        booksInLending.forEach(b => {
+            totalCirculations++;
+            if (b.returned) {
+                returnedBooksCount++;
+            } else {
+                activeBooksCount++;
+                if (isLendingOverdue) overdueBooksCount++;
+            }
+
+            // Track book popularity
+            const bTitle = b.name || `Book #${b.id}`;
+            bookBorrowCounts[bTitle] = (bookBorrowCounts[bTitle] || 0) + 1;
+        });
+
+        // Track borrower stats
+        if (l.borrower) {
+            if (!borrowerStats[l.borrower]) {
+                borrowerStats[l.borrower] = { total: 0, active: 0, lendDate: l.lendDate };
+            }
+            borrowerStats[l.borrower].total += booksInLending.length;
+            borrowerStats[l.borrower].active += booksInLending.filter(b => !b.returned).length;
         }
     });
 
-    const topBorrowers = Object.entries(borrowerCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
-
-    const today = new Date();
+    const returnRate = totalCirculations > 0 ? Math.round((returnedBooksCount / totalCirculations) * 100) : 100;
 
     container.innerHTML = `
-        <div class="stat-card" style="background:var(--accent-light); padding:1rem; border-radius:8px; text-align:center;">
-            <div style="font-size:0.9rem; color:var(--accent-primary); font-weight:600;">Currently Lent</div>
-            <div style="font-size:2rem; font-weight:700; color:var(--accent-primary); margin:0.5rem 0;">${totalLentBooks}</div>
-            <div style="font-size:0.8rem; color:var(--text-secondary);">Total books out of library</div>
+        <div class="stat-card" style="background:var(--surface); border:1px solid var(--border-color); padding:1.25rem; border-radius:12px; text-align:center;">
+            <div style="font-size:0.85rem; color:var(--text-secondary); font-weight:600;">Total Circulations</div>
+            <div style="font-size:2rem; font-weight:700; color:var(--accent-primary); margin:0.4rem 0;">${totalCirculations}</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">All-time book loans</div>
         </div>
-        <div style="flex:2;">
-            <h4 style="margin:0 0 1rem 0; font-size:0.9rem; color:var(--text-secondary);">Active Borrowers & Duration</h4>
-            <div class="stat-leaderboard" style="max-height: 300px; overflow-y: auto;">
-                ${topBorrowers.map(([name, count]) => {
-        const borrowerLending = activeLendings.find(l => l.borrower === name);
-        const lendDate = borrowerLending && borrowerLending.lendDate ? new Date(borrowerLending.lendDate) : today;
-        const diffDays = Math.max(0, Math.floor((today - lendDate) / (1000 * 60 * 60 * 24)));
-
-        return `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border-color); font-size:14px;">
-                        <div>
-                            <span style="font-weight:600;">${escapeHTML(name)}</span>
-                            <div style="font-size:0.75rem; color:var(--text-secondary);">${diffDays} days since lend date</div>
-                        </div>
-                        <span style="font-weight:700; color:var(--accent-primary);">${count} Books</span>
-                    </div>`;
-    }).join('')}
-                ${topBorrowers.length === 0 ? '<p style="color:var(--text-secondary); font-size:0.85rem;">No active borrowers.</p>' : ''}
-            </div>
+        <div class="stat-card" style="background:var(--surface); border:1px solid var(--border-color); padding:1.25rem; border-radius:12px; text-align:center;">
+            <div style="font-size:0.85rem; color:var(--text-secondary); font-weight:600;">Currently Out</div>
+            <div style="font-size:2rem; font-weight:700; color:#3b82f6; margin:0.4rem 0;">${activeBooksCount}</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">Active books with patrons</div>
+        </div>
+        <div class="stat-card" style="background:var(--surface); border:1px solid var(--border-color); padding:1.25rem; border-radius:12px; text-align:center;">
+            <div style="font-size:0.85rem; color:var(--text-secondary); font-weight:600;">Overdue Loans</div>
+            <div style="font-size:2rem; font-weight:700; color:#ef4444; margin:0.4rem 0;">${overdueBooksCount}</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">Past expected return date</div>
+        </div>
+        <div class="stat-card" style="background:var(--surface); border:1px solid var(--border-color); padding:1.25rem; border-radius:12px; text-align:center;">
+            <div style="font-size:0.85rem; color:var(--text-secondary); font-weight:600;">Return Rate</div>
+            <div style="font-size:2rem; font-weight:700; color:#10b981; margin:0.4rem 0;">${returnRate}%</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">${returnedBooksCount} books returned safely</div>
         </div>
     `;
+
+    // Render Top Borrowers
+    const topBorrowersEl = document.getElementById('stat-lending-top-borrowers');
+    if (topBorrowersEl) {
+        const sortedBorrowers = Object.entries(borrowerStats)
+            .sort((a, b) => b[1].total - a[1].total)
+            .slice(0, 10);
+
+        if (sortedBorrowers.length === 0) {
+            topBorrowersEl.innerHTML = '<p class="empty-state" style="font-size:0.85rem;">No borrowers recorded yet.</p>';
+        } else {
+            topBorrowersEl.innerHTML = sortedBorrowers.map(([name, stat], idx) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border-color); font-size:14px;">
+                    <div>
+                        <span style="font-weight:600;">#${idx + 1} ${escapeHTML(name)}</span>
+                        ${stat.active > 0 ? `<span style="font-size:0.75rem; color:#ef4444; margin-left:0.5rem;">(${stat.active} active)</span>` : ''}
+                    </div>
+                    <span style="font-weight:700; color:var(--accent-primary);">${stat.total} borrowed</span>
+                </div>
+            `).join('');
+        }
+    }
+
+    // Render Most Borrowed Books
+    const topBooksEl = document.getElementById('stat-lending-top-books');
+    if (topBooksEl) {
+        const sortedBooks = Object.entries(bookBorrowCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+
+        if (sortedBooks.length === 0) {
+            topBooksEl.innerHTML = '<p class="empty-state" style="font-size:0.85rem;">No circulation history yet.</p>';
+        } else {
+            topBooksEl.innerHTML = sortedBooks.map(([title, count], idx) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border-color); font-size:14px;">
+                    <div style="display:flex; align-items:center; gap:0.5rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:80%;">
+                        <span style="font-weight:600; color:var(--text-secondary); min-width:24px;">#${idx + 1}</span>
+                        <span style="font-weight:600; overflow:hidden; text-overflow:ellipsis;">${escapeHTML(title)}</span>
+                    </div>
+                    <span style="font-weight:700; color:var(--accent-primary);">${count} ×</span>
+                </div>
+            `).join('');
+        }
+    }
 }
 
 // --- Lending CSV Export / Import ---
@@ -3347,6 +3772,120 @@ window.logActivity = function (action, details) {
 
     if (logs.length > 500) logs = logs.slice(0, 500); // Keep last 500
     localStorage.setItem('mimir_activity_logs', JSON.stringify(logs));
+};
+
+window.toggleActivityLogModal = function (show) {
+    const modal = document.getElementById('activity-log-modal');
+    if (modal) modal.style.display = show ? 'flex' : 'none';
+};
+
+window.openActivityLogModal = function () {
+    window.toggleActivityLogModal(true);
+    window.renderActivityLogs();
+};
+
+window.renderActivityLogs = function () {
+    const container = document.getElementById('activity-logs-container');
+    if (!container) return;
+
+    let logs = [];
+    try {
+        logs = JSON.parse(localStorage.getItem('mimir_activity_logs') || '[]');
+    } catch (e) {
+        logs = [];
+    }
+
+    const searchInput = document.getElementById('activity-log-search');
+    const filterSelect = document.getElementById('activity-log-filter');
+    const searchVal = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const filterVal = filterSelect ? filterSelect.value.toLowerCase().trim() : '';
+
+    const filteredLogs = logs.filter(log => {
+        const action = (log.action || '').toLowerCase();
+        const details = (log.details || '').toLowerCase();
+
+        if (filterVal && !action.includes(filterVal)) return false;
+        if (searchVal && !action.includes(searchVal) && !details.includes(searchVal)) return false;
+        return true;
+    });
+
+    if (filteredLogs.length === 0) {
+        container.innerHTML = '<div style="padding:2.5rem; text-align:center; color:var(--text-secondary); font-size:0.9rem;">No activity logs found.</div>';
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="activity-log-table">
+            <thead>
+                <tr>
+                    <th style="width:140px;">Timestamp</th>
+                    <th style="width:120px;">Action</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${filteredLogs.map(log => {
+                    const d = new Date(log.timestamp);
+                    const formattedDate = isNaN(d) ? log.timestamp : d.toLocaleString();
+
+                    let badgeClass = 'badge-default';
+                    const act = (log.action || '').toLowerCase();
+                    if (act.includes('book')) badgeClass = 'badge-book';
+                    else if (act.includes('lend') || act.includes('return')) badgeClass = 'badge-lend';
+                    else if (act.includes('tag')) badgeClass = 'badge-tag';
+                    else if (act.includes('category')) badgeClass = 'badge-category';
+                    else if (act.includes('user') || act.includes('login') || act.includes('auth')) badgeClass = 'badge-user';
+
+                    return `
+                        <tr>
+                            <td style="color:var(--text-secondary); font-size:0.75rem; white-space:nowrap;">${formattedDate}</td>
+                            <td><span class="activity-log-badge ${badgeClass}">${escapeHTML(log.action)}</span></td>
+                            <td style="word-break:break-word;">${escapeHTML(log.details)}</td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+};
+
+window.exportActivityLogs = function () {
+    let logs = [];
+    try {
+        logs = JSON.parse(localStorage.getItem('mimir_activity_logs') || '[]');
+    } catch (e) {
+        logs = [];
+    }
+
+    if (logs.length === 0) return showToast('No logs to export.');
+
+    const headers = ['Timestamp', 'Action', 'Details'];
+    const csvRows = [headers.join(',')];
+
+    logs.forEach(l => {
+        const row = [
+            `"${(l.timestamp || '').replace(/"/g, '""')}"`,
+            `"${(l.action || '').replace(/"/g, '""')}"`,
+            `"${(l.details || '').replace(/"/g, '""')}"`
+        ];
+        csvRows.push(row.join(','));
+    });
+
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mimir_activity_logs_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Activity logs exported to CSV.');
+};
+
+window.clearActivityLogs = function () {
+    if (!confirm('Are you sure you want to clear all activity logs?')) return;
+    localStorage.removeItem('mimir_activity_logs');
+    window.renderActivityLogs();
+    showToast('Activity logs cleared.');
 };
 
 // ==========================================
