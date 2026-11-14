@@ -41,6 +41,19 @@ function bookToDb(book) {
     };
 }
 
+function dbToLending(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        borrower: row.borrower || '',
+        lendDate: row.lendDate || row.lend_date || row.lenddate || '',
+        status: (row.status || 'lent').toLowerCase(),
+        returnDate: row.returnDate || row.return_date || row.returndate || '',
+        books: Array.isArray(row.books) ? row.books : (typeof row.books === 'string' ? JSON.parse(row.books || '[]') : []),
+        created_at: row.created_at || row.createdAt || ''
+    };
+}
+
 // ==========================================
 // State Management
 // ==========================================
@@ -144,6 +157,28 @@ function loadFromLocalStorage() {
     }
 }
 
+// --- localStorage lendings helpers ---
+function saveLendingsToLocalStorage() {
+    try {
+        localStorage.setItem('mimir_lendings_backup', JSON.stringify(lendings));
+    } catch (e) {
+        console.warn('Lendings localStorage backup failed:', e);
+    }
+}
+
+function loadLendingsFromLocalStorage() {
+    try {
+        const raw = localStorage.getItem('mimir_lendings_backup');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(dbToLending).filter(Boolean);
+        return null;
+    } catch (e) {
+        console.warn('Lendings localStorage load failed:', e);
+        return null;
+    }
+}
+
 async function initLendings() {
     try {
         let allData = [];
@@ -152,14 +187,15 @@ async function initLendings() {
         let keepFetching = true;
 
         while (keepFetching) {
-            const { data, error } = await supabase
-                .from('lendings')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .range(fetchedCount, fetchedCount + pageSize - 1);
+            let query = supabase.from('lendings').select('*');
+            try {
+                query = query.order('created_at', { ascending: false });
+            } catch (e) {}
+
+            const { data, error } = await query.range(fetchedCount, fetchedCount + pageSize - 1);
 
             if (error) {
-                console.error("Lendings range error:", error);
+                console.error("Lendings fetch error:", error);
                 throw error;
             }
 
@@ -171,102 +207,163 @@ async function initLendings() {
                 keepFetching = false;
             }
         }
-        lendings = allData;
+        lendings = allData.map(dbToLending).filter(Boolean);
+        saveLendingsToLocalStorage();
         console.log(`Loaded ${lendings.length} lending records.`);
     } catch (error) {
         console.error("Error loading lendings:", error);
+        const localLendings = loadLendingsFromLocalStorage();
+        if (localLendings && localLendings.length > 0) {
+            lendings = localLendings;
+            console.log(`Loaded ${lendings.length} lending records from localStorage.`);
+        } else {
+            lendings = [];
+        }
     }
 }
 
 async function saveLending(lendingRecord) {
-    if (!currentUser) return;
+    if (!currentUser) {
+        showToast("Please login to record lending.");
+        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
+        return false;
+    }
     try {
         const record = {
-            ...lendingRecord,
             id: crypto.randomUUID(),
+            borrower: lendingRecord.borrower,
+            lendDate: lendingRecord.lendDate,
+            status: (lendingRecord.status || 'lent').toLowerCase(),
+            returnDate: lendingRecord.returnDate || null,
             books: lendingRecord.books,
             created_at: new Date().toISOString()
         };
-        const { error } = await supabase.from('lendings').insert(record);
-        if (error) throw error;
+
+        // Attempt insert. If column error occurs (due to snake_case vs camelCase schema), retry with snake_case
+        let { error } = await supabase.from('lendings').insert(record);
+        if (error && (error.message?.includes('column') || error.code === '42703')) {
+            const snakeRecord = {
+                id: record.id,
+                borrower: record.borrower,
+                lend_date: record.lendDate,
+                status: record.status,
+                return_date: record.returnDate,
+                books: record.books,
+                created_at: record.created_at
+            };
+            const retry = await supabase.from('lendings').insert(snakeRecord);
+            if (retry.error) throw retry.error;
+        } else if (error) {
+            throw error;
+        }
+
         lendings.push(record);
+        saveLendingsToLocalStorage();
         showToast("Lending record saved!");
         return true;
     } catch (error) {
         console.error("Error saving lending:", error);
-        showToast("Failed to save lending record.");
+        showToast("Failed to save lending record: " + (error.message || "Unknown error"));
         return false;
     }
 }
 
 async function markReturned(lendId, bookId = null) {
-    if (!currentUser) return;
+    if (!currentUser) {
+        showToast("Login required to mark as returned.");
+        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
+        return;
+    }
     try {
-        const lending = lendings.find(l => l.id === lendId);
+        const lending = lendings.find(l => String(l.id) === String(lendId));
         if (!lending) return;
 
-        if (bookId) {
-            const book = lending.books.find(b => b.id === bookId);
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        if (bookId !== null && bookId !== undefined) {
+            const book = lending.books.find(b => String(b.id) === String(bookId));
             if (book) {
                 book.returned = true;
-                book.returnDate = new Date().toISOString().split('T')[0];
+                book.returnDate = todayStr;
             }
             const allReturned = lending.books.every(b => b.returned);
             if (allReturned) {
                 lending.status = 'returned';
-                lending.returnDate = new Date().toISOString().split('T')[0];
+                lending.returnDate = todayStr;
             }
         } else {
             lending.status = 'returned';
-            lending.returnDate = new Date().toISOString().split('T')[0];
+            lending.returnDate = todayStr;
             lending.books.forEach(b => {
                 b.returned = true;
-                if (!b.returnDate) b.returnDate = new Date().toISOString().split('T')[0];
+                if (!b.returnDate) b.returnDate = todayStr;
             });
         }
 
-        const { error } = await supabase
-            .from('lendings')
-            .update({ books: lending.books, status: lending.status, returnDate: lending.returnDate })
-            .eq('id', lendId);
-        if (error) throw error;
+        // Try update with camelCase, fallback to snake_case if column error
+        let updatePayload = {
+            books: lending.books,
+            status: lending.status,
+            returnDate: lending.returnDate || null
+        };
+        let { error } = await supabase.from('lendings').update(updatePayload).eq('id', lendId);
+        if (error && (error.message?.includes('column') || error.code === '42703')) {
+            updatePayload = {
+                books: lending.books,
+                status: lending.status,
+                return_date: lending.returnDate || null
+            };
+            const retry = await supabase.from('lendings').update(updatePayload).eq('id', lendId);
+            if (retry.error) throw retry.error;
+        } else if (error) {
+            throw error;
+        }
 
-        showToast(bookId ? "Book marked as returned." : "All books marked as returned.");
+        saveLendingsToLocalStorage();
+        showToast(bookId !== null && bookId !== undefined ? "Book marked as returned." : "All books marked as returned.");
         renderLendingPage();
         renderStats();
         renderBooks();
     } catch (error) {
         console.error("Error updating lending:", error);
-        showToast("Error updating record. " + error.message);
+        showToast("Error updating record: " + (error.message || "Unknown error"));
     }
 }
 
 window.markReturned = async function (lendId, bookId = null) {
-    if (!currentUser) return showToast("Login required to mark as returned.");
     await markReturned(lendId, bookId);
 };
 
 async function deleteLendingRecord(lendId) {
-    if (!currentUser) return;
+    if (!currentUser) {
+        showToast("Login required to delete lending records.");
+        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
+        return;
+    }
     if (!confirm("Are you sure you want to delete this lending record permanently?")) return;
 
     try {
         const { error } = await supabase.from('lendings').delete().eq('id', lendId);
         if (error) throw error;
-        lendings = lendings.filter(l => l.id !== lendId);
+        lendings = lendings.filter(l => String(l.id) !== String(lendId));
+        saveLendingsToLocalStorage();
         showToast("Lending record deleted.");
         renderLendingPage();
         renderStats();
         renderBooks();
     } catch (error) {
         console.error("Error deleting lending:", error);
-        showToast("Failed to delete record.");
+        showToast("Failed to delete record: " + (error.message || "Unknown error"));
     }
 }
 window.deleteLendingRecord = deleteLendingRecord;
 
 async function clearLendingHistory() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        showToast("Login required to clear history.");
+        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
+        return;
+    }
     const history = lendings.filter(l => l.status === 'returned');
     if (history.length === 0) return showToast("No history to clear.");
 
@@ -277,12 +374,13 @@ async function clearLendingHistory() {
         const { error } = await supabase.from('lendings').delete().in('id', ids);
         if (error) throw error;
         lendings = lendings.filter(l => l.status !== 'returned');
+        saveLendingsToLocalStorage();
         showToast("Lending history cleared.");
         renderLendingPage();
         renderStats();
     } catch (error) {
         console.error("Error clearing history:", error);
-        showToast("Failed to clear history.");
+        showToast("Failed to clear history: " + (error.message || "Unknown error"));
     }
 }
 window.clearLendingHistory = clearLendingHistory;
@@ -511,12 +609,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const isAdmin = document.body.classList.contains('is-admin');
                         userMgmtBtn.style.display = isAdmin ? 'inline-flex' : 'none';
                     }
-                } else if (s.id === 'view-add-edit') {
+                } else if (s.id === 'add-book') {
                     // Ensure form is reset when navigating to add/edit tab
                     resetForm();
                 } else if (s.id === 'view-people') {
                     renderPeopleList();
                 } else if (s.id === 'view-lending') {
+                    const lendDateEl = document.getElementById('lend-date');
+                    if (lendDateEl && !lendDateEl.value) {
+                        lendDateEl.value = new Date().toISOString().split('T')[0];
+                    }
                     renderLendingPage();
                 }
             });
@@ -732,13 +834,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Lending Form
     const lendingForm = document.getElementById('add-lending-form');
     if (lendingForm) {
+        const lendDateEl = document.getElementById('lend-date');
+        if (lendDateEl && !lendDateEl.value) {
+            lendDateEl.value = new Date().toISOString().split('T')[0];
+        }
+
         lendingForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (lendingSelectedBooks.length === 0) return showToast("Select at least one book.");
 
+            const lendDateVal = document.getElementById('lend-date').value || new Date().toISOString().split('T')[0];
             const record = {
                 borrower: document.getElementById('lendee-name').value.trim(),
-                lendDate: document.getElementById('lend-date').value,
+                lendDate: lendDateVal,
                 books: lendingSelectedBooks.map(b => ({ id: b.id, name: b.name })),
                 status: 'lent'
             };
@@ -757,6 +865,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lendingSearchInput) {
         lendingSearchInput.addEventListener('input', (e) => updateLendingAutocomplete(e.target.value));
     }
+
+    // Dismiss lending book search results when clicking outside
+    document.addEventListener('click', (e) => {
+        const searchInput = document.getElementById('lending-book-search');
+        const resultsContainer = document.getElementById('lending-search-results');
+        if (resultsContainer && searchInput && !resultsContainer.contains(e.target) && e.target !== searchInput) {
+            resultsContainer.style.display = 'none';
+        }
+    });
 
     // Feature 17: Borrower Autocomplete
     setupLendeeAutocomplete();
@@ -853,7 +970,7 @@ function applyFilters() {
             if (queryNumeric !== null && b.id === queryNumeric) return true;
 
             const tagsStr = (b.tags || []).join(' ');
-            const searchable = `${b.name} ${b.sinhalaName || ''} ${b.author} ${b.translator} ${b.category} ${b.language} ${tagsStr}`.toLowerCase();
+            const searchable = `${b.name} ${b.sinhalaName || ''} ${b.author} ${b.authorSinhala || ''} ${b.translator || ''} ${b.translatorSinhala || ''} ${b.category} ${b.language} ${tagsStr}`.toLowerCase();
             return searchable.includes(query);
         }
 
@@ -948,7 +1065,7 @@ function renderPage() {
                 translatorHtml = '<div class="book-translator-row book-translator-empty"></div>';
             }
 
-            const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => lb.id === book.id));
+            const isLent = lendings.some(l => l.status === 'lent' && Array.isArray(l.books) && l.books.some(lb => String(lb.id) === String(book.id) && !lb.returned));
             const lentBadge = isLent ? `<span class="lent-symbol" title="Currently Lent Out">🔒</span>` : '';
 
             return `
@@ -1225,30 +1342,28 @@ function startEditMode(id) {
     currentTags = [...(book.tags || [])];
     renderTags();
 
-    openModal(addBookModal);
-    document.getElementById('edit-modal-title').textContent = 'Edit Book';
-
     // Feature 19: Lending History per Book
     const historySection = document.getElementById('lending-history-section');
     const historyContainer = document.getElementById('lending-history-container');
     if (historySection && historyContainer) {
         const thisBookLendings = lendings.filter(l =>
-            l.books && l.books.some(b => b.id === id)
-        ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            l.books && l.books.some(b => String(b.id) === String(id))
+        ).sort((a, b) => new Date(b.created_at || b.createdAt || b.lendDate || 0) - new Date(a.created_at || a.createdAt || a.lendDate || 0));
 
         if (thisBookLendings.length > 0) {
             historySection.style.display = 'block';
             historyContainer.innerHTML = thisBookLendings.map(l => {
-                const lBook = l.books.find(b => b.id === id);
+                const lBook = l.books.find(b => String(b.id) === String(id));
                 const isReturned = l.status === 'returned' || (lBook && lBook.returned);
                 const returnedStatusHtml = isReturned
                     ? `<span style="font-size:0.8rem; color:var(--accent-primary);">Returned ${lBook && lBook.returnDate ? lBook.returnDate : ''}</span>`
                     : `<span style="font-size:0.8rem; color:#f59e0b; font-weight:600;">Currently Borrowed</span>`;
+                const dateStr = (l.created_at || l.createdAt || l.lendDate || '').split('T')[0];
                 return `
                         <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--surface); border-bottom:1px solid var(--border-color); font-size:0.9rem;">
                             <div>
                                 <strong style="display:block;">${escapeHTML(l.borrower)}</strong>
-                                <span style="font-size:0.8rem; color:var(--text-secondary);">${l.created_at.split('T')[0]}</span>
+                                <span style="font-size:0.8rem; color:var(--text-secondary);">${dateStr}</span>
                             </div>
                             <div style="text-align:right;">
                                 ${returnedStatusHtml}
@@ -1268,13 +1383,15 @@ function resetForm() {
     addBookForm.reset();
     isEditing = false;
     editBookId.value = '';
-    document.getElementById('edit-modal-title').textContent = 'Add New Book';
-    document.getElementById('lending-history-container').innerHTML = '';
-    document.getElementById('lending-history-section').style.display = 'none';
+    const historyContainer = document.getElementById('lending-history-container');
+    const historySection = document.getElementById('lending-history-section');
+    if (historyContainer) historyContainer.innerHTML = '';
+    if (historySection) historySection.style.display = 'none';
 
     formTitle.textContent = 'Add to Library';
     formSubtitle.textContent = 'Enter the details of the new book. Fields with suggestions will auto-complete as you type.';
     formSubmitBtn.textContent = 'Save Book';
+    formCancelBtn.style.display = 'none';
 
     currentTags = [];
     renderTags();
@@ -1409,6 +1526,11 @@ function exportToCsv() {
 function handleCsvImport(e) {
     const file = e.target.files[0];
     if (!file) return;
+    if (!currentUser) {
+        showToast("Login required to import CSV.");
+        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -1487,7 +1609,7 @@ async function parseCsvData(csvText) {
                 translatorSinhala: (bookRecord['translator sinhala name'] || bookRecord['translator_sinhala_name'] || bookRecord['translatorsinhalaname'] || '').trim(),
                 language: bookRecord.language || 'Other',
                 category: categoryIndex !== -1 ? (rowData[categoryIndex] || 'Other') : 'Other',
-                tags: bookRecord.tags ? bookRecord.tags.split(';').map(t => t.trim()).filter(t => t) : []
+                tags: bookRecord.tags ? bookRecord.tags.split(/[;,]/).map(t => t.trim()).filter(t => t) : []
             };
 
             if (parsedBook.id > maxId) maxId = parsedBook.id;
@@ -1580,53 +1702,60 @@ function renderStats() {
     const accent5 = '#4cc9f0';
     const palette = [accent1, accent5, accent4, accent3, accent2, '#ffb703', '#fb8500', '#2a9d8f'];
 
-    // Category Chart
-    const catCtx = document.getElementById('categoryChart').getContext('2d');
-    if (categoryChartInstance) categoryChartInstance.destroy();
+    // Charts
+    if (typeof Chart !== 'undefined') {
+        const catCanvas = document.getElementById('categoryChart');
+        if (catCanvas) {
+            const catCtx = catCanvas.getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
 
-    categoryChartInstance = new Chart(catCtx, {
-        type: 'pie',
-        data: {
-            labels: Object.keys(catCounts),
-            datasets: [{
-                data: Object.values(catCounts),
-                backgroundColor: palette,
-                borderWidth: 2,
-                borderColor: surfaceColor
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'right', labels: { color: textColor, font: { family: 'Inter' } } }
-            }
+            categoryChartInstance = new Chart(catCtx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(catCounts),
+                    datasets: [{
+                        data: Object.values(catCounts),
+                        backgroundColor: palette,
+                        borderWidth: 2,
+                        borderColor: surfaceColor
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: textColor, font: { family: 'Inter' } } }
+                    }
+                }
+            });
         }
-    });
 
-    // Language Chart
-    const langCtx = document.getElementById('languageChart').getContext('2d');
-    if (languageChartInstance) languageChartInstance.destroy();
+        const langCanvas = document.getElementById('languageChart');
+        if (langCanvas) {
+            const langCtx = langCanvas.getContext('2d');
+            if (languageChartInstance) languageChartInstance.destroy();
 
-    languageChartInstance = new Chart(langCtx, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(langCounts),
-            datasets: [{
-                data: Object.values(langCounts),
-                backgroundColor: palette.slice().reverse(),
-                borderWidth: 2,
-                borderColor: surfaceColor
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'right', labels: { color: textColor, font: { family: 'Inter' } } }
-            }
+            languageChartInstance = new Chart(langCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(langCounts),
+                    datasets: [{
+                        data: Object.values(langCounts),
+                        backgroundColor: palette.slice().reverse(),
+                        borderWidth: 2,
+                        borderColor: surfaceColor
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: textColor, font: { family: 'Inter' } } }
+                    }
+                }
+            });
         }
-    });
+    }
 
     // Top 20 leaderboards
     renderLeaderboard('stat-authors-list', 'author', 15);
@@ -1901,7 +2030,7 @@ window.confirmMerge = async function (index, sourceName) {
     }
 
     // Find Sinhala name of target (use the target's sinhalaName if it has one)
-    const sinhalaKey = `${currentPeopleField}SinhalaName`;
+    const sinhalaKey = `${currentPeopleField}Sinhala`;
     const targetBook = books.find(b => (b[currentPeopleField] || '').trim() === targetName);
     const targetSinhala = (targetBook && targetBook[sinhalaKey]) || '';
 
@@ -2130,9 +2259,11 @@ function applySettings() {
         titleSize: '--user-title-size',
         sinhalaSize: '--user-sinhala-size',
         authorSize: '--user-author-size',
+        authorSinSize: '--user-author-sin-size',
         translatorSize: '--user-translator-size',
+        translatorSinSize: '--user-translator-sin-size',
     };
-    const defaults = { idSize: 15, titleSize: 18, sinhalaSize: 17, authorSize: 14, translatorSize: 13 };
+    const defaults = { idSize: 15, titleSize: 18, sinhalaSize: 17, authorSize: 14, authorSinSize: 14, translatorSize: 13, translatorSinSize: 13 };
     Object.entries(propMap).forEach(([key, prop]) => {
         const val = currentSettings[key] || defaults[key];
         document.documentElement.style.setProperty(prop, `${val}px`);
@@ -2382,6 +2513,10 @@ window.resetLendingForm = function () {
     if (form) form.reset();
     lendingSelectedBooks = [];
     renderLendingBooks();
+    const lendDateEl = document.getElementById('lend-date');
+    if (lendDateEl) {
+        lendDateEl.value = new Date().toISOString().split('T')[0];
+    }
 }
 
 window.updateLendingAutocomplete = function (query) {
@@ -2395,12 +2530,17 @@ window.updateLendingAutocomplete = function (query) {
     const matched = books.filter(b => {
         const idStr = String(b.id || '').toLowerCase();
         const nameStr = (b.name || '').toLowerCase();
+        const sinNameStr = (b.sinhalaName || '').toLowerCase();
 
         const idMatch = idStr.includes(q);
-        const nameMatch = nameStr.includes(q);
+        const nameMatch = nameStr.includes(q) || sinNameStr.includes(q);
 
         const isAlreadySelected = lendingSelectedBooks.some(s => String(s.id) === String(b.id));
-        const isLent = lendings.some(l => l.status === 'lent' && l.books.some(lb => String(lb.id) === String(b.id)));
+        const isLent = lendings.some(l => 
+            l.status === 'lent' && 
+            Array.isArray(l.books) && 
+            l.books.some(lb => String(lb.id) === String(b.id) && !lb.returned)
+        );
 
         return (idMatch || nameMatch) && !isAlreadySelected && !isLent;
     }).slice(0, 10);
@@ -2412,7 +2552,7 @@ window.updateLendingAutocomplete = function (query) {
 
     resultsContainer.innerHTML = matched.map(b => `
         <li onclick="addLendingBook('${b.id}')">
-            <strong>#${b.id}</strong> - ${escapeHTML(b.name)}
+            <strong>#${b.id}</strong> - ${escapeHTML(b.name)} ${b.sinhalaName ? `<span style="opacity:0.7;">(${escapeHTML(b.sinhalaName)})</span>` : ''}
         </li>
     `).join('');
     resultsContainer.style.display = 'block';
@@ -2444,6 +2584,7 @@ function renderLendingBooks() {
     lendingSelectedBooks.forEach((book, index) => {
         const span = document.createElement('span');
         span.className = 'tag-chip';
+        span.title = book.name || '';
         span.innerHTML = `
             #${book.id}
             <button type="button" class="tag-remove" onclick="removeLendingBook(${index})">
@@ -2468,16 +2609,16 @@ function renderLendingPage() {
     const searchInput = document.getElementById('lending-search');
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
-    let active = lendings.filter(l => l.status === 'lent').sort((a, b) => new Date(b.lendDate) - new Date(a.lendDate));
-    let history = lendings.filter(l => l.status === 'returned').sort((a, b) => new Date(b.returnDate) - new Date(a.returnDate));
+    let active = lendings.filter(l => l.status === 'lent').sort((a, b) => new Date(b.lendDate || 0) - new Date(a.lendDate || 0));
+    let history = lendings.filter(l => l.status === 'returned').sort((a, b) => new Date(b.returnDate || 0) - new Date(a.returnDate || 0));
 
     if (query) {
-        active = active.filter(l => l.borrower.toLowerCase().includes(query));
-        history = history.filter(l => l.borrower.toLowerCase().includes(query));
+        active = active.filter(l => (l.borrower || '').toLowerCase().includes(query));
+        history = history.filter(l => (l.borrower || '').toLowerCase().includes(query));
     }
 
-    activeContainer.innerHTML = renderLendingTable(active, true);
-    historyContainer.innerHTML = renderLendingTable(history, false);
+    if (activeContainer) activeContainer.innerHTML = renderLendingTable(active, true);
+    if (historyContainer) historyContainer.innerHTML = renderLendingTable(history, false);
 }
 
 function renderLendingTable(data, isActive) {
@@ -2491,12 +2632,13 @@ function renderLendingTable(data, isActive) {
                     <th>Books</th>
                     <th>Date</th>
                     ${isActive ? '<th>Wait Time</th>' : '<th>Returned</th>'}
-                    ${isActive ? '<th>Action</th>' : ''}
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
                 ${data.map(l => {
-        const days = isActive ? Math.floor((new Date() - new Date(l.lendDate)) / (1000 * 60 * 60 * 24)) : 0;
+        const lendTime = l.lendDate ? new Date(l.lendDate) : new Date();
+        const days = isActive ? Math.max(0, Math.floor((new Date() - lendTime) / (1000 * 60 * 60 * 24))) : 0;
         const dayClass = days > 30 ? 'days-high' : days > 14 ? 'days-med' : 'days-low';
 
         return `
@@ -2504,7 +2646,7 @@ function renderLendingTable(data, isActive) {
                         <td style="font-weight:600; cursor:pointer;" onclick="filterLendingByBorrower('${escapeHTML(l.borrower).replace(/'/g, "\\'")}')" title="Click to see all history for ${escapeHTML(l.borrower)}">${escapeHTML(l.borrower)}</td>
                         <td>
                             <div class="lending-books-list">
-                                ${l.books.map(b => `
+                                ${(Array.isArray(l.books) ? l.books : []).map(b => `
                                     <div class="lending-book-item ${b.returned ? 'returned' : ''}">
                                         <div style="display:flex; align-items:center; gap:0.5rem; justify-content:space-between; width:100%;">
                                             <span><span class="lending-book-id">#${b.id}</span> ${escapeHTML(b.name)}</span>
@@ -2513,21 +2655,21 @@ function renderLendingTable(data, isActive) {
                 if (b.returned && b.returnDate) {
                     return `<span style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap;">returned ${b.returnDate}</span>`;
                 } else if (isActive && !b.returned) {
-                    const bookDays = Math.floor((new Date() - new Date(l.lendDate)) / (1000 * 60 * 60 * 24));
+                    const bookDays = Math.max(0, Math.floor((new Date() - lendTime) / (1000 * 60 * 60 * 24)));
                     const bookDayClass = bookDays > 30 ? 'days-high' : bookDays > 14 ? 'days-med' : 'days-low';
                     return `<span class="days-count ${bookDayClass}" style="font-size:0.7rem; padding:0.15rem 0.4rem;">${bookDays}d</span>`;
                 }
                 return '';
             })()}
-                                                ${(isActive && !b.returned) ? `<button class="btn-icon-tiny" title="Return this book" onclick="markReturned('${l.id}', ${b.id})">↩️</button>` : ''}
+                                                ${(isActive && !b.returned) ? `<button class="btn-icon-tiny" title="Return this book" onclick="markReturned('${l.id}', '${escapeHTML(b.id)}')">↩️</button>` : ''}
                                             </div>
                                         </div>
                                     </div>`).join('')}
                             </div>
                         </td>
-                        <td style="font-size:0.85rem;">${l.lendDate}</td>
+                        <td style="font-size:0.85rem;">${l.lendDate || ''}</td>
                         <td>
-                            ${isActive ? `<span class="days-count ${dayClass}">${days} days</span>` : `<span style="font-size:0.85rem;">${l.returnDate}</span>`}
+                            ${isActive ? `<span class="days-count ${dayClass}">${days} days</span>` : `<span style="font-size:0.85rem;">${l.returnDate || ''}</span>`}
                         </td>
                         <td>
                             <div style="display:flex; gap:0.5rem;">
@@ -2549,12 +2691,15 @@ function renderLendingSummaryStats() {
     if (!container) return;
 
     const activeLendings = lendings.filter(l => l.status === 'lent');
-    const totalLentBooks = activeLendings.reduce((sum, l) => sum + l.books.length, 0);
+    const totalLentBooks = activeLendings.reduce((sum, l) => sum + (Array.isArray(l.books) ? l.books.filter(b => !b.returned).length : 0), 0);
 
     // Borrower Stats
     const borrowerCounts = {};
     activeLendings.forEach(l => {
-        borrowerCounts[l.borrower] = (borrowerCounts[l.borrower] || 0) + l.books.length;
+        const unreturnedCount = Array.isArray(l.books) ? l.books.filter(b => !b.returned).length : 0;
+        if (unreturnedCount > 0 && l.borrower) {
+            borrowerCounts[l.borrower] = (borrowerCounts[l.borrower] || 0) + unreturnedCount;
+        }
     });
 
     const topBorrowers = Object.entries(borrowerCounts)
@@ -2574,8 +2719,8 @@ function renderLendingSummaryStats() {
             <div class="stat-leaderboard" style="max-height: 300px; overflow-y: auto;">
                 ${topBorrowers.map(([name, count]) => {
         const borrowerLending = activeLendings.find(l => l.borrower === name);
-        const lendDate = borrowerLending ? new Date(borrowerLending.lendDate) : today;
-        const diffDays = Math.floor((today - lendDate) / (1000 * 60 * 60 * 24));
+        const lendDate = borrowerLending && borrowerLending.lendDate ? new Date(borrowerLending.lendDate) : today;
+        const diffDays = Math.max(0, Math.floor((today - lendDate) / (1000 * 60 * 60 * 24)));
 
         return `
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--border-color); font-size:14px;">
@@ -2610,7 +2755,7 @@ window.exportLendingCsv = function () {
     const rows = [headers.join(',')];
 
     lendings.forEach(l => {
-        l.books.forEach(b => {
+        (Array.isArray(l.books) ? l.books : []).forEach(b => {
             rows.push([
                 escapeCsv(l.id),
                 escapeCsv(l.borrower),
@@ -2637,6 +2782,26 @@ window.exportLendingCsv = function () {
     showToast(`Exported ${lendings.length} lending records.`);
 };
 
+function parseCsvTokens(rowStr) {
+    const rowTokens = [];
+    let inQuotes = false;
+    let currentToken = '';
+
+    for (let j = 0; j < rowStr.length; j++) {
+        const char = rowStr[j];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            rowTokens.push(currentToken);
+            currentToken = '';
+        } else {
+            currentToken += char;
+        }
+    }
+    rowTokens.push(currentToken);
+    return rowTokens.map(t => t.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+}
+
 window.handleLendingCsvImport = function (e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -2661,9 +2826,7 @@ window.handleLendingCsvImport = function (e) {
 
             const lendingMap = {};
             for (let i = 1; i < lines.length; i++) {
-                const cols = lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g) || [];
-                const clean = cols.map(c => c.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
-
+                const clean = parseCsvTokens(lines[i]);
                 const lendId = clean[idxMap['LendingID']];
                 if (!lendId) continue;
 
@@ -2675,7 +2838,7 @@ window.handleLendingCsvImport = function (e) {
                         status: clean[idxMap['Status']] || 'lent',
                         returnDate: (idxMap['ReturnDate'] !== undefined ? clean[idxMap['ReturnDate']] : '') || '',
                         books: [],
-                        createdAt: new Date().toISOString()
+                        created_at: new Date().toISOString()
                     };
                 }
 
@@ -2697,12 +2860,30 @@ window.handleLendingCsvImport = function (e) {
             showToast(`Importing ${toImport.length} lending records...`);
 
             for (const record of toImport) {
-                const { error: insertErr } = await supabase.from('lendings').upsert(record);
-                if (insertErr) throw insertErr;
+                // Upsert to Supabase with fallback for snake_case
+                let { error: insertErr } = await supabase.from('lendings').upsert(record);
+                if (insertErr && (insertErr.message?.includes('column') || insertErr.code === '42703')) {
+                    const snakeRecord = {
+                        id: record.id,
+                        borrower: record.borrower,
+                        lend_date: record.lendDate,
+                        status: record.status,
+                        return_date: record.returnDate || null,
+                        books: record.books,
+                        created_at: record.created_at
+                    };
+                    const retry = await supabase.from('lendings').upsert(snakeRecord);
+                    if (retry.error) throw retry.error;
+                } else if (insertErr) {
+                    throw insertErr;
+                }
                 lendings.push(record);
             }
 
+            saveLendingsToLocalStorage();
             renderLendingPage();
+            renderStats();
+            renderBooks();
             showToast(`✅ Imported ${toImport.length} records.${skipped > 0 ? ` ${skipped} duplicates skipped.` : ''}`);
         } catch (err) {
             console.error('Lending CSV import error:', err);
@@ -2946,7 +3127,7 @@ window.renameTag = async function (oldTag) {
         showToast("Tag renamed successfully.");
         renderTagList();
         applyFilters(); // Re-render books in UI
-        updateFilterDropdowns(); // Update tag suggestions if any
+        populateFilterDropdowns(); // Update tag suggestions if any
     }
 }
 
@@ -2968,7 +3149,7 @@ window.deleteTag = async function (tag) {
         showToast("Tag deleted successfully.");
         renderTagList();
         applyFilters();
-        updateFilterDropdowns();
+        populateFilterDropdowns();
     }
 }
 
